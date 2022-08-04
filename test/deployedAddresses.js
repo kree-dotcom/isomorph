@@ -1,0 +1,76 @@
+//ETH mainnet addresses
+const sUSD_ETH = `0x57Ab1ec28D129707052df4dF418D58a2D46d5f51`
+const sETH_ETH = `0x5e74C9036fb86BD7eCdcb084a0673EFc32eA31cb`;
+const sBTC_ETH = `0xfE18be6b3Bd88A2D2A7f928d00292E7a9963CfC6`;
+const Synthetix_owner_ETH = '0xEb3107117FEAd7de89Cd14D463D340A2E6917769'; //controller of synthetix contracts
+const system_ETH = '0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E'; // Synthetix System
+const SynthetixTreasury_ETH = "0x99f4176ee457afedffcb1839c7ab7a030a5e4a92"; //doner for sUSD
+const SETHDoner_ETH = "0x9B7a6E6b894E243E994cfAA32eA07D8a60740981"; //doner for sETH
+const Exchange_Rates_ETH = `0xd69b189020EF614796578AfE4d10378c5e7e1138`; //Synth exchange rates 
+const System_Status_ETH = `0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E`; //Synth frozen/Inactive status etc
+const Proxy_ERC20_ETH = `0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F`;
+//kovan testnet addresses
+const sUSD_KETH = sUSD_ETH //this is the same
+const sETH_KETH = `0x54c4b5cb58c880dd1734123c8b588e49edf442fb`;
+
+const Exchange_Rates_KETH = `0xEb3A9651cFaE0eCAECCf8c8b0581A6311F6C5921`; 
+const System_Status_KETH = `0xcf8B3d452A56Dab495dF84905655047BC1Dc41Bc`; 
+
+const Proxy_ERC20_KETH = `0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F`;
+
+//optimism mainnet addresses
+const sUSD_OP = `0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9`;
+const sETH_OP = `0xE405de8F52ba7559f9df3C368500B6E6ae6Cee49`;
+const sBTC_OP = `0x298B9B95708152ff6968aafd889c6586e9169f1D`;
+const Synthetix_owner_OP = `0x6d4a64C57612841c2C6745dB2a4E4db34F002D20`;
+const system_OP = `0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD`;
+const sUSDDoner_OP = "0x2f17058C77F70F52D89AA5D54300b30EEf9FA6fC"; //doner for sUSD
+const SETHDoner_OP = `0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b`; //doner for sETH
+const Exchange_Rates_OP = `0x22602469d704BfFb0936c7A7cfcD18f7aA269375`; //Synth exchange rates 
+const System_Status_OP = `0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD`; //Synth frozen/Inactive status etc
+const Proxy_ERC20_OP = `0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4`; //Proxy for ERC20s
+const Lyra_LP = "0x5Db73886c4730dBF3C562ebf8044E19E8C93843e"; //Lyra's sETH Liquidity Pool 
+const Lyra_LP_token = `0x0d1a91354A387a1e9E8FCD8f576670c4C3b723cA` //Lyra's sETH LP token
+const Lyra_Doner = `0x9644A6920bd0a1923C2C6C1DddF691b7a42e8A65`
+
+//optimism kovan addresses Depreciated testnet, blank addresses are ones we need to control so are useless
+const sUSD_kOP = `0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57`;
+const sETH_kOP = `0x94B41091eB29b36003aC1C6f0E55a5225633c884`;
+const sBTC_kOP = `0x23F608ACc41bd7BCC617a01a9202214EE305439a`;
+const Synthetix_owner_kOP = '';
+const system_kOP = `0x75d83253021b7874DF52B1f954Eb70AcA918a537`; //direct contract may become stale!
+const sUSDDoner_kOP = '' //doner for sUSD
+const SETHDoner_kOP = ''; //doner for sETH
+const Exchange_Rates_kOP = `0x37488De9A5Eaf311840D4B21a5B35A16bcb69603`; //Synth exchange rates 
+const System_Status_kOP = `0xE90F90DCe5010F615bEC29c5db2D9df798D48183`; //Synth frozen/Inactive status etc
+let Proxy_ERC20_kOP = `0x0064A673267696049938AA47595dD0B3C2e705A1`; //Proxy for ERC20s
+
+
+const mainnet_ETH = {sUSD: sUSD_ETH, sETH: sETH_ETH, sBTC: sBTC_ETH,
+                           sBTC: sBTC_ETH, Synth_Owner: Synthetix_owner_ETH,
+                           System: system_ETH, sUSD_Doner: SynthetixTreasury_ETH,
+                           sETH_Doner: SETHDoner_ETH, Exchange_Rates: Exchange_Rates_ETH,
+                           System_Status: System_Status_ETH, Proxy_ERC20: Proxy_ERC20_ETH }
+
+const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
+                            sBTC: sBTC_OP, Synth_Owner: Synthetix_owner_OP,
+                            System: system_OP, sUSD_Doner: sUSDDoner_OP,
+                            sETH_Doner: SETHDoner_OP, Exchange_Rates: Exchange_Rates_OP,
+                            System_Status: System_Status_OP, Proxy_ERC20: Proxy_ERC20_OP,
+                            Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
+                            Lyra_Doner: Lyra_Doner }
+
+const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
+                            sBTC: sBTC_kOP, Synth_Owner: Synthetix_owner_kOP,
+                            System: system_kOP, sUSD_Doner: sUSDDoner_kOP,
+                            sETH_Doner: SETHDoner_kOP, Exchange_Rates: Exchange_Rates_kOP,
+                            System_Status: System_Status_kOP, Proxy_ERC20: Proxy_ERC20_kOP }
+
+addresses = {mainnet: mainnet_ETH, optimism: optimism_OP, optimism_Kovan : optimism_Kovan}
+
+module.exports = { addresses }
+
+
+      
+      
+      
