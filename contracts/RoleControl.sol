@@ -1,7 +1,3 @@
-//Isomorph.loans RoleControl.sol
-//SPDX-License-Identifier: MIT
-//https://github.com/kree-dotcom/isomorph
-
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -10,9 +6,9 @@ contract RoleControl is AccessControl{
 
     // admin address can add  after `TIME_DELAY` has passed.
     // admin address can also remove minters or pause minting, no time delay needed.
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 internal constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public previous_action_hash = 0x0;
-    uint256 public immutable TIME_DELAY;
+    uint256 private immutable TIME_DELAY;
     mapping(bytes32 => uint256) public action_queued;
     uint256 public actionNonce = 0;
     
@@ -21,8 +17,12 @@ contract RoleControl is AccessControl{
     event AddRole(address indexed account, bytes32 indexed role, address indexed addedBy);
     event RemoveRole(address indexed account, bytes32 indexed role, address indexed addedBy);
 
-    modifier onlyAdmin{
+    //this is horrid I am sorry, code too big kept occuring for vaults.
+    function onlyAdminInternal() internal view {
         require(hasRole(ADMIN_ROLE, msg.sender), "Caller is not an admin");
+    }
+    modifier onlyAdmin{
+        onlyAdminInternal();
         _;
     }
 

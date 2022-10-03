@@ -32,6 +32,9 @@ const Proxy_ERC20_OP = `0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4`; //Proxy for
 const Lyra_LP = "0x5Db73886c4730dBF3C562ebf8044E19E8C93843e"; //Lyra's sETH Liquidity Pool 
 const Lyra_LP_token = `0x0d1a91354A387a1e9E8FCD8f576670c4C3b723cA` //Lyra's sETH LP token
 const Lyra_Doner = `0x9644A6920bd0a1923C2C6C1DddF691b7a42e8A65`
+const USDC = `0x7F5c764cBc14f9669B88837ca1490cCa17c31607` 
+const router = "0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9"
+const chainlink_SUSD_feed = "0x7f99817d87baD03ea21E05112Ca799d715730efe"
 
 //optimism kovan addresses Depreciated testnet, blank addresses are ones we need to control so are useless
 const sUSD_kOP = `0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57`;
@@ -44,6 +47,24 @@ const SETHDoner_kOP = ''; //doner for sETH
 const Exchange_Rates_kOP = `0x37488De9A5Eaf311840D4B21a5B35A16bcb69603`; //Synth exchange rates 
 const System_Status_kOP = `0xE90F90DCe5010F615bEC29c5db2D9df798D48183`; //Synth frozen/Inactive status etc
 let Proxy_ERC20_kOP = `0x0064A673267696049938AA47595dD0B3C2e705A1`; //Proxy for ERC20s
+
+//optimism goerli addresses
+const sUSD_gOP = `0xeBaEAAD9236615542844adC5c149F86C36aD1136`;
+const sETH_gOP = `0x6c3856488e664C6b0380AAEfBFD1c28cd6727eC8`;
+const sBTC_gOP = `0x23c7a77D22Fc1274eCecB703f74699500db106E6`;
+const Synthetix_owner_gOP = ``;
+const system_gOP = `0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916`; //THIS AND SYSTEM STATUS ARE THE SAME??
+
+
+const Exchange_Rates_gOP = `0x280E5dFaA78CE685a846830bAe5F2FD21d6A3D89` //Synth exchange rates //mainnet had changed so be cautious
+const System_Status_gOP = `0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916`; //Synth frozen/Inactive status etc
+const Proxy_ERC20_gOP = `0x2E5ED97596a8368EB9E44B1f3F25B2E813845303`; //Proxy for ERC20s
+const Lyra_LP_gOP = `` //Lyra's sETH Liquidity Pool 
+const Lyra_LP_token_gOP = `` //Lyra's sETH LP token
+const Lyra_Doner_gOP = ``
+const USDC_gOP =  ``//might have to fake, can't find
+const router_gOP = ``
+const chainlink_SUSD_feed_gOP = ``//do chainlink have feeds on testnets?
 
 
 const mainnet_ETH = {sUSD: sUSD_ETH, sETH: sETH_ETH, sBTC: sBTC_ETH,
@@ -58,7 +79,9 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             sETH_Doner: SETHDoner_OP, Exchange_Rates: Exchange_Rates_OP,
                             System_Status: System_Status_OP, Proxy_ERC20: Proxy_ERC20_OP,
                             Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
-                            Lyra_Doner: Lyra_Doner }
+                            Lyra_Doner: Lyra_Doner,
+                            USDC: USDC, Router: router,
+                            Chainlink_SUSD_Feed : chainlink_SUSD_feed }
 
 const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
                             sBTC: sBTC_kOP, Synth_Owner: Synthetix_owner_kOP,

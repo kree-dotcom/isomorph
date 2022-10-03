@@ -15,12 +15,13 @@ contract TESTCollateralBook is CollateralBook {
         uint256 _liquidationRatio,
         uint256 _interestPer3Min,
         address _liquidityPool,
-        uint256 _liquidation_return
+        uint256 _liquidation_return, 
+        uint256 _assetType
         ) external collateralExists(_collateralAddress) onlyAdmin {
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
-        require(vaultSet, "Vault not deployed yet");
+        require(vaults[_assetType] != address(0), "Vault not deployed yet");
         //prevent setting liquidationRatio too low ssuch that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
         require( _liquidation_return *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
         //Now we must ensure interestPer3Min changes aren't applied retroactively

@@ -1,7 +1,3 @@
-//Isomorph.loans moUSDToken.sol
-//SPDX-License-Identifier: MIT
-//https://github.com/kree-dotcom/isomorph
-
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";

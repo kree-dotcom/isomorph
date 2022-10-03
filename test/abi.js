@@ -36,11 +36,22 @@ const ERC20 = [
     "function getLiveBoards() external view returns(uint256[] memory)"
   ]
 
+  const Router = [
+    "function quoteRemoveLiquidity(address, address, bool, uint256) external view returns(uint256, uint256)",
+    "function getAmountOut(uint256, address, address) external view returns(uint256, bool)"
+  ]
+
+  const PriceFeed = [
+    "function latestRoundData() external view returns(uint80, int256, uint256, uint256, uint80)"
+  ]
+
   ABIs = {ERC20: ERC20, 
           SynthSystem: SynthSystem, 
           LyraLP :LyraLP, 
           GreekCache : GreekCache,
-          OptionMarket : OptionMarket}
+          OptionMarket : OptionMarket,
+          Router : Router,
+          PriceFeed : PriceFeed}
   module.exports = { ABIs }
 
   

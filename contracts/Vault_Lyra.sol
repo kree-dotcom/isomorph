@@ -1,6 +1,4 @@
-//Isomorph.loans Vault.sol
-//SPDX-License-Identifier: MIT
-//https://github.com/kree-dotcom/isomorph
+//SPDX-License-Identifier: UNLICENSED
 
 pragma solidity =0.8.9; 
 pragma abicoder v2;
@@ -15,7 +13,7 @@ import "./helper/interfaces/IExchangeRates.sol";
 import "./helper/interfaces/ISystemStatus.sol";
 import "./helper/interfaces/ILiquidityPoolAvalon.sol";
 //dev debug
-//import "hardhat/console.sol";
+import "hardhat/console.sol";
 //Open Zeppelin dependancies
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -28,13 +26,14 @@ import "./RoleControl.sol";
 uint256 constant VAULT_TIME_DELAY = 3 days;
 
 
-contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
+contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
 
     using SafeERC20 for IERC20;
     //these mappings store the loan details of each users loan against each collateral.
     //collateral address => user address => quantity
     mapping(address => mapping(address => uint256)) public collateralPosted;
     mapping(address => mapping(address => uint256)) public moUSDLoaned;
+    mapping(address => mapping(address => uint256)) public moUSDLoanAndInterest;
 
     //variables relating to access control and setting new roles
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -57,56 +56,13 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
     uint256 public dayCounter = block.timestamp;
     uint256 public dailyTotal = 0;
 
-    //These two handle fees paid to liquidators and the protocol by users 
-    uint256 public feePaid = 20 ether /100; //fee paid to users calling liquidation
+    //This fee paid to the protocol by user on opening a loan
     uint256 public loanOpenFee = 1 ether /100; //1 percent opening fee.
 
-   
-    //Kovan addresses
-    /*
-    address public constant EXCHANGE_RATES = 0xEb3A9651cFaE0eCAECCf8c8b0581A6311F6C5921;
-    address public constant PROXY_ERC20 = 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F;
-    address public constant SUSD_ADDR = 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51;
-    address public constant SYSTEM_STATUS = 0xcf8B3d452A56Dab495dF84905655047BC1Dc41Bc;
-    */
-
-    //Mainnet addresses
-    /*
-    address public constant EXCHANGE_RATES = 0xd69b189020EF614796578AfE4d10378c5e7e1138;
-    address public constant PROXY_ERC20 = 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F;
-    address public constant SUSD_ADDR = 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51;
-    address public constant SYSTEM_STATUS = 0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E;
-    */
-    //Optimism Kovan addresses
-    /*
-    address public constant EXCHANGE_RATES = 0x37488De9A5Eaf311840D4B21a5B35A16bcb69603;
-    address public constant PROXY_ERC20 = 0x0064A673267696049938AA47595dD0B3C2e705A1;
-    address public constant SUSD_ADDR = 0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57;
-    address public constant SYSTEM_STATUS = 0xE90F90DCe5010F615bEC29c5db2D9df798D48183;
-    */
-    //Optimism Goerli addresses
-    /*
-    address public constant EXCHANGE_RATES = 0xd90690084Cc97F87214f373a6835A2748C5bedd5 //checked
-    address public constant PROXY_ERC20 = 0x2E5ED97596a8368EB9E44B1f3F25B2E813845303 //checked
-    address public constant SUSD_ADDR = 0xeBaEAAD9236615542844adC5c149F86C36aD1136 //might be wrong?
-    address public constant SYSTEM_STATUS = 0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916 //checked
-    */
-    //Optimism Mainnet addresses
-    
-    address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
-    address public constant PROXY_ERC20 = 0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4;
-    address public constant SUSD_ADDR = 0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9;
-    address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
-    
     
     ITreasury treasury;
     IMoUSDToken moUSD;
-    ICollateralBook collateralBook;
-    ISynthetix synthetix = ISynthetix(PROXY_ERC20);
-    IExchangeRates synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
-    ISystemStatus synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);
-    IERC20 SUSD = IERC20(SUSD_ADDR);
-    
+    ICollateralBook collateralBook;    
    
 
     event OpenOrIncreaseLoan(address indexed user, uint256 loanTaken, bytes32 indexed collateralToken, uint256 collateralAmount); 
@@ -166,7 +122,7 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         emit SystemUnpaused(msg.sender);
     }
 
-    /// @notice dailyMax can be set to 0 preventing anyone from opening new loans.
+    /// @notice dailyMax can be set to 0 effectively preventing anyone from opening new loans.
     function setDailyMax(uint256 _newDailyMax) external onlyAdmin {
         require(_newDailyMax < 100_000_000 ether ); //sanity check, require less than 100 million opened per day
         emit ChangeDailyMax(_newDailyMax, dailyMax); //ignoring CEI pattern here
@@ -180,18 +136,11 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_newOpenLoanFee <= 1 ether /10 ); 
         emit ChangeOpenLoanFee(_newOpenLoanFee, loanOpenFee); //ignoring CEI pattern here
         loanOpenFee = _newOpenLoanFee;
-        
-        
     }
 
     /**
         Internal helper and check functions
      */
-
-    /// @dev process for Synthetix assets
-    /// @dev leverages synthetix system to verify that the collateral in question is currently trading
-    /// @dev this prevents people frontrunning closed weekend markets for expected price crashes etc
-    /// @notice this call verifies Synthetix system, exchange and the synths in question are all available.
 
     /// @dev process for Lyra LP assets
     /// @dev this uses the liquidity Pool associated with the LP token to verify the circuit breaker is not active
@@ -199,13 +148,8 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @notice if any of them aren't the function will revert.
     /// @param _currencyKey the code used by synthetix to identify different synths, linked in collateral structure to collateral address
     function _checkIfCollateralIsActive(bytes32 _currencyKey, AssetType _assetType) internal view {
-        //if it's a synth use synthetix circuit breaks
-         if (_assetType == AssetType.Synthetix_Synth){
-             synthetixSystemStatus.requireExchangeBetweenSynthsAllowed(_currencyKey, SUSD_CODE);
-         }
-         // if it's an LP token use Lyra
-         if (_assetType == AssetType.Lyra_LP){
-             
+            
+             //Lyra LP tokens use their associated LiquidityPool to check if they're active
              ILiquidityPoolAvalon LiquidityPool = ILiquidityPoolAvalon(collateralBook.liquidityPoolOf(_currencyKey));
              bool isStale;
              uint circuitBreakerExpiry;
@@ -213,7 +157,6 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
              (, isStale, circuitBreakerExpiry) = LiquidityPool.getTokenPriceWithCheck();
              require( !(isStale), "Global Cache Stale, can't trade");
              require(circuitBreakerExpiry < block.timestamp, "Lyra Circuit Breakers active, can't trade");
-         }
     }
     /// @notice while this could be abused to DOS the system, given the openLoan fee this is an expensive attack to maintain
     function _checkDailyMaxLoans(uint256 _amountAdded) internal {
@@ -306,12 +249,12 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
      **/
     function _increaseLoan(uint256 _loanAmount) internal {
         uint256 userMint;
-        uint256 loanFee;
+        uint256 userOpenFee;
         _checkDailyMaxLoans(_loanAmount);
-        (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
+        (userMint, userOpenFee) = _findFees(loanOpenFee, _loanAmount);
         moUSD.mint(_loanAmount);
         moUSD.transfer(msg.sender, userMint);
-        moUSD.transfer(address(treasury), loanFee);
+        moUSD.transfer(address(treasury), userOpenFee);
     }
     /// @dev internal function used to increase user collateral on loan.
     /// @param _collateral the ERC20 compatible collateral to use, already set up in another function
@@ -325,10 +268,17 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @dev internal function used to decrease user collateral on loan.
     /// @param _collateralAddress the ERC20 compatible collateral Address NOT already set up as an IERC20.
     /// @param _amount the amount of collateral to be transfered back to the user.
-    /// @param _USDburning quantity of moUSD being returned to the vault, this can be zero.
-    function _decreaseLoan(address _collateralAddress, uint256 _amount, uint256 _USDburning) internal {
+    /// @param _USDReturned quantity of moUSD being returned to the vault, this can be zero.
+    /// @param _interestPaid quantity of interest paid on closing loan, this is transfered to the treasury , this can be zero
+    function _decreaseLoan(address _collateralAddress, uint256 _amount, uint256 _USDReturned, uint256 _interestPaid) internal {
         IERC20 collateral = IERC20(_collateralAddress);
-        moUSD.burn(msg.sender, _USDburning);
+        //_interestPaid is always less thn _USDReturned so this is safe.
+        uint256 USDBurning = _USDReturned - _interestPaid;
+        moUSD.transferFrom(msg.sender, address(this), _USDReturned);
+        //burn original loan principle
+        moUSD.burn(address(this), USDBurning);
+        //transfer interest earned on loan to treasury
+        moUSD.transfer(address(treasury), _interestPaid);
         bool success = collateral.transfer(msg.sender, _amount);
         require(success, "collateral transfer failed");
     }
@@ -351,29 +301,18 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
     //moUSD is assumed to be valued at $1 by all of the system to avoid oracle attacks. 
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
     /// @param _amount quantity of collateral to price into sUSD
-    /// @return returns the value of the given synth in sUSD which is assumed to be pegged at $1.
+    /// @return returns the value of the given collateral in sUSD which is assumed to be pegged at $1.
     function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount, AssetType _assetType) public view returns(uint256){
-         //if it's a synth use synthetix for pricing
-         if (_assetType == AssetType.Synthetix_Synth){
-             return (synthetixExchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE));
-         }
-         // if it's an LP token use Lyra
-         if (_assetType == AssetType.Lyra_LP){
-             ILiquidityPoolAvalon LiquidityPool = ILiquidityPoolAvalon(collateralBook.liquidityPoolOf(_currencyKey));
-             //we have already checked for stale greeks so here we call the basic price function.
-             uint256 tokenPrice = LiquidityPool.getTokenPrice();            
-             uint256 withdrawalFee = _getWithdrawalFee(LiquidityPool);
-             uint256 USDValue  = (_amount * tokenPrice) / LOAN_SCALE;
-             //we remove the Liquidity Pool withdrawalFee 
-             //as there's no way to remove the LP position without paying this.
-             uint256 USDValueAfterFee = USDValue * (LOAN_SCALE- withdrawalFee)/LOAN_SCALE;
-             return(USDValueAfterFee);
-             
-         }
-         //default catch, should never trigger
-         revert("Invalid assetType supplied for pricing collateral");
-
-        
+         //The LiquidityPool associated with the LP Token is used for pricing
+        ILiquidityPoolAvalon LiquidityPool = ILiquidityPoolAvalon(collateralBook.liquidityPoolOf(_currencyKey));
+        //we have already checked for stale greeks so here we call the basic price function.
+        uint256 tokenPrice = LiquidityPool.getTokenPrice();          
+        uint256 withdrawalFee = _getWithdrawalFee(LiquidityPool);
+        uint256 USDValue  = (_amount * tokenPrice) / LOAN_SCALE;
+        //we remove the Liquidity Pool withdrawalFee 
+        //as there's no way to remove the LP position without paying this.
+        uint256 USDValueAfterFee = USDValue * (LOAN_SCALE- withdrawalFee)/LOAN_SCALE;
+        return(USDValueAfterFee);
     }
 
     /**
@@ -413,13 +352,17 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         _checkIfCollateralIsActive(currencyKey, assetType);
         //make sure the total moUSD borrowed doesn't exceed the opening borrow margin ratio
         uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender], assetType);
-        uint256 totalUSDborrowed = _USDborrowed +  (moUSDLoaned[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
+        uint256 totalUSDborrowed = _USDborrowed +  (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
+
         //update mappings with new loan amounts
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        moUSDLoaned[_collateralAddress][msg.sender] = moUSDLoaned[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);
+        moUSDLoaned[_collateralAddress][msg.sender] = moUSDLoaned[_collateralAddress][msg.sender] + _USDborrowed;
+        moUSDLoanAndInterest[_collateralAddress][msg.sender] = moUSDLoanAndInterest[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);
+        
         emit OpenOrIncreaseLoan(msg.sender, _USDborrowed, currencyKey, _colAmount);
+
         //Now all effects are handled, transfer the assets so we follow CEI pattern
         _increaseCollateral(collateral, _colAmount);
         _increaseLoan(_USDborrowed);
@@ -460,7 +403,7 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         //debatable check begins here 
         uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
         uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat, assetType);
-        uint256 USDborrowed = (moUSDLoaned[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
+        uint256 USDborrowed = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Liquidation margin not met!");
         //debatable check ends here
@@ -503,7 +446,7 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey, assetType);
-        uint256 moUSDdebt = (moUSDLoaned[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
+        uint256 moUSDdebt = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         require( moUSDdebt >= _USDToVault, "Trying to return more moUSD than borrowed!");
         uint256 outstandingMoUSD = moUSDdebt - _USDToVault;
         if(outstandingMoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
@@ -512,12 +455,26 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
             uint256 borrowMargin = (outstandingMoUSD * minOpeningMargin) / LOAN_SCALE;
             require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
+
+        //record paying off loan principle before interest
+        uint256 interestPaid;
+        uint256 loanPrinciple = moUSDLoaned[_collateralAddress][msg.sender];
+        if( loanPrinciple >= _USDToVault){
+            //pay off loan principle first
+            moUSDLoaned[_collateralAddress][msg.sender] = loanPrinciple - _USDToVault;
+        }
+        else{
+            interestPaid = _USDToVault - loanPrinciple;
+            //loan principle is fully repaid so record this.
+            moUSDLoaned[_collateralAddress][msg.sender] = 0;
+        }
+
         //update mappings with reduced amounts
-        moUSDLoaned[_collateralAddress][msg.sender] = moUSDLoaned[_collateralAddress][msg.sender] - ((_USDToVault * LOAN_SCALE) / virtualPrice);
+        moUSDLoanAndInterest[_collateralAddress][msg.sender] = moUSDLoanAndInterest[_collateralAddress][msg.sender] - ((_USDToVault * LOAN_SCALE) / virtualPrice);
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
         emit ClosedLoan(msg.sender, _USDToVault, currencyKey, _collateralToUser);
         //Now all effects are handled, transfer the assets so we follow CEI pattern
-        _decreaseLoan(_collateralAddress, _collateralToUser, _USDToVault);
+        _decreaseLoan(_collateralAddress, _collateralToUser, _USDToVault, interestPaid);
         }
     
     
@@ -535,18 +492,34 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
         bytes32 _currencyKey, 
         uint256 _virtualPrice
         ) internal {
-        IERC20 collateral = IERC20(_collateralAddress);
-        //this mapping should be zero only if the loan was a bad debt and so had remaining debt cleared.
-        if(moUSDLoaned[_collateralAddress][_loanHolder] > 0){
-            moUSDLoaned[_collateralAddress][_loanHolder] = moUSDLoaned[_collateralAddress][_loanHolder] - ((_moUSDReturned * LOAN_SCALE) / _virtualPrice);
+        //IERC20 collateral = IERC20(_collateralAddress);
+        //record paying off loan principle before interest
+            uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
+            uint256 interestPaid;
+            if( loanPrinciple >= _moUSDReturned){
+                //pay off loan principle first
+                moUSDLoaned[_collateralAddress][_loanHolder] = loanPrinciple - _moUSDReturned;
+            }
+            else{
+                interestPaid = _moUSDReturned - loanPrinciple;
+                //loan principle is fully repaid so record this.
+                moUSDLoaned[_collateralAddress][_loanHolder] = 0;
+            }
+        //if non-zero we are not handling a bad debt so the loanAndInterest will need updating
+        if(moUSDLoanAndInterest[_collateralAddress][_loanHolder] > 0){
+            //
+            moUSDLoanAndInterest[_collateralAddress][_loanHolder] = moUSDLoanAndInterest[_collateralAddress][_loanHolder] - ((_moUSDReturned * LOAN_SCALE) / _virtualPrice);
+        }
+        else{
+            //now that we've determined how much principle and interest is being repaid we wipe the principle for bad debts too
+            moUSDLoaned[_collateralAddress][_loanHolder] = 0;
         }
         
         collateralPosted[_collateralAddress][_loanHolder] = collateralPosted[_collateralAddress][_loanHolder] - _collateralLiquidated;
-        emit Liquidation(_loanHolder, msg.sender, _moUSDReturned, _currencyKey, _collateralLiquidated);
-        moUSD.burn(msg.sender, _moUSDReturned); //burn reverts on failure
-        bool success = collateral.transfer(msg.sender, _collateralLiquidated);
-        require(success, "collateral transfer failed");
         
+        emit Liquidation(_loanHolder, msg.sender, _moUSDReturned, _currencyKey, _collateralLiquidated);
+        //finally handle transfer of collateral and moUSD.
+        _decreaseLoan(_collateralAddress, _collateralLiquidated, _moUSDReturned, interestPaid);
     }
 
 
@@ -604,7 +577,7 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
             //check for frozen or paused collateral
             _checkIfCollateralIsActive(currencyKey, assetType);
             //check how much of the specified loan should be closed
-            uint256 moUSDBorrowed = (moUSDLoaned[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
+            uint256 moUSDBorrowed = (moUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
             uint256 totalUserCollateral = collateralPosted[_collateralAddress][_loanHolder];
             uint256 currentPrice = priceCollateralToUSD(currencyKey, LOAN_SCALE, assetType); //assumes LOAN_SCALE = 1 ether, i.e. one unit of collateral!
             uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, currentPrice, moUSDBorrowed, liquidatableMargin);
@@ -621,7 +594,7 @@ contract Vault is RoleControl(VAULT_TIME_DELAY), Pausable {
                 if(moUSDBorrowed > moUSDreturning){
                     //if a user is being fully liquidated we will forgive any remaining debt so it
                     // doesn't roll over if they open a new loan of the same collateral.
-                    delete moUSDLoaned[_collateralAddress][_loanHolder];
+                    delete moUSDLoanAndInterest[_collateralAddress][_loanHolder];
                     emit BadDebtCleared(_loanHolder, msg.sender, moUSDBorrowed - moUSDreturning, currencyKey);
                     
                 }

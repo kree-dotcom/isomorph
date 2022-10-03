@@ -1,8 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-interface-generator");
 require('@symblox/hardhat-abi-gen');
-//require('hardhat-dependency-compiler');
-//const { lyraContractPaths } = require('@lyrafinance/protocol/dist/test/utils/package/index-paths')
+
 
 
 require('dotenv').config()
@@ -52,8 +51,6 @@ module.exports = {
 		accounts: [ process.env.DEPLOYMENT_ACCOUNT ]
 					}
 				}	,
-	//dependencyCompiler: {
-					//paths: lyraContractPaths, }
   	    
 };
 

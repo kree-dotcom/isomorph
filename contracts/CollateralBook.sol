@@ -1,8 +1,4 @@
-//Isomorph.loans CollateralBook.sol
-//SPDX-License-Identifier: MIT
-//https://github.com/kree-dotcom/isomorph
-
-
+//SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.8.9;
 pragma abicoder v2;
 import "./RoleControl.sol";
@@ -18,14 +14,14 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
     mapping(address => bool) public collateralPaused;
     mapping(address => Collateral) public collateralProps;
     mapping(bytes32 => address) public liquidityPoolOf;
-    bool public vaultSet;
-    address public vaultAddress;
-    IVault vault;
+    mapping(uint256 => address) public vaults;
+
+    
     bytes32 public constant VAULT_ROLE = keccak256("MINTER_ROLE");
 
     uint256 public constant THREE_MIN = 180;
     uint256 public constant DIVISION_BASE = 1 ether;
-    uint256 public constant CHANGE_COLLATERAL_DELAY = 1 hours; //2 days;
+    uint256 public constant CHANGE_COLLATERAL_DELAY = 200; //2 days
 
     //temporary data stores for changing Collateral variables
     address queuedCollateralAddress;
@@ -47,7 +43,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 lastUpdateTime; //last blocktimestamp this collateral's virtual price was updated
         uint256 virtualPrice; //price accounting for growing interest accrued on any loans taken in this collateral
         uint256 assetType; //number to indicate what system this collateral token belongs to, 
-                            // assetType is used to determine which value function is called in Vault.
+                            // assetType is used to determine which Vault we are looking at
     }
 
 
@@ -103,12 +99,15 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _minimumRatio,
         uint256 _liquidationRatio,
         uint256 _interestPer3Min,
+        uint256 _assetType,
         address _liquidityPool
+
     ) external collateralExists(_collateralAddress) onlyAdmin {
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
-        require(vaultSet, "Vault not deployed yet");
+        require(vaults[_assetType] != address(0), "Vault not deployed yet");
+        IVault vault = IVault(vaults[_assetType]);
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
         require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low");
 
@@ -215,13 +214,11 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
     /// @dev Governnance callable only, this should be set once atomically on construction 
     /// @notice once called it can no longer be called.
     /// @param _vault the address of the vault system
-    function setVaultAddress(address _vault) external onlyAdmin{
-        require(!vaultSet , "Already set vault");
+    function addVaultAddress(address _vault, uint256 _assetType) external onlyAdmin{
         require(_vault != address(0), "Zero address");
+        require(vaults[_assetType] == address(0), "Asset type already has vault");
         _setupRole(VAULT_ROLE, _vault);
-        vaultAddress = _vault;
-        vault =  IVault(_vault);
-        vaultSet = true;
+        vaults[_assetType]= _vault;
     }
     
     /// @notice this takes in the updated virtual price of a collateral and records it as well as the time it was updated.
@@ -304,8 +301,9 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio > 0);
-        require(vaultSet, "Vault not deployed yet");
-        
+        require(vaults[_assetType] != address(0), "Vault not deployed yet");
+        IVault vault = IVault(vaults[_assetType]);
+
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
         require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
         collateralValid[_collateralAddress] = true;
