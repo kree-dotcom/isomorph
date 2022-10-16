@@ -34,6 +34,11 @@ If you swap to a different network you will need to update the static addresses 
 Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, 
 if this happens run again.
 
+# Slither results
+Running slither . --filter-paths "contracts/tests|node_modules|contracts/Migrations|contracts/helper|contracts/interfaces|contracts/ConfirmedOwnerWithProposal"
+produces 218 results. The above paths were filtered due to either not being written by us or being irrelevant. 
+
+
 ## Definitions:
 
 - synths: Any token offered by the Synthetix protocol, they are synthetic assets where their prices track the underlying original token/stock/commodity/currency. Redemption into any other synth is guaranteed by  SNX stakers who assume the debt pool risk ensuring the value of all issued synths. 

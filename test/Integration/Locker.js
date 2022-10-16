@@ -7,6 +7,7 @@ const { ABIs } = require("../abi.js");
 const { Router } = require("@uniswap/sdk");
 
 async function impersonateForToken(provider, receiver, ERC20, donerAddress, amount) {
+    let tokens_before = await ERC20.balanceOf(receiver.address)
     await network.provider.request({
         method: "hardhat_impersonateAccount",
         params: [donerAddress],
@@ -17,6 +18,8 @@ async function impersonateForToken(provider, receiver, ERC20, donerAddress, amou
         method: "hardhat_stopImpersonatingAccount",
         params: [donerAddress]
     });
+    let tokens_after = await ERC20.balanceOf(receiver.address)
+    expect(tokens_after).to.equal(tokens_before.add(amount))
 
 }
 
@@ -229,6 +232,7 @@ describe("Integration tests: Locker contract", function() {
         })
 
         it("Should be able to vote with a single veNFT", async function() {
+            this.timeout(100000);
             //force a certain timestamp to make checking the emitted event easier
             let new_timestamp = last_timestamp + time_increase
             await helpers.timeSkip(time_increase)
@@ -368,7 +372,6 @@ describe("Integration tests: Locker contract", function() {
             let balance_before = await VELO.balanceOf(locker.address)
             
             let locked_tokens = await voting_escrow.locked(id)
-            console.log("locked tokens ", locked_tokens)
 
             //Do withdrawNFT() call and check emitted event
             await expect(locker.withdrawNFT(id, slot)
@@ -450,6 +453,7 @@ describe("Integration tests: Locker contract", function() {
             await locker.connect(alice).claimBribesMultiNFTs([external_bribe.address], [[OP.address]], ids)
 
             let balance_after = await OP.balanceOf(locker.address)
+            expect(balance_after.gt(balance_before)).to.equal(true)
             expect(balance_after).to.equal(balance_before.add(bribe_earned))
         });
 

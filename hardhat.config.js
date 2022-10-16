@@ -28,9 +28,7 @@ module.exports = {
 	hardhat: {
 		forking: {
 		  url: process.env.OPTIMISM_MAINNET_API_AND_KEY,
-		  blockNumber: 13957420 //28047218  // 8th Oct 2022 
-		  //main pin 13957420, 6th july //30th June 2022
-		   //old pin 12185090 //18th June 2022
+		  blockNumber: 29617000 //16th oct 2022
 		}
 	  },
   	kovan: {

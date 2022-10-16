@@ -79,7 +79,7 @@ async function cycleVirtualPrice(steps, collateral) {
 }
 
 
-describe("Integration tests: Vault Synths contract", function () {
+describe.only("Integration tests: Vault Synths contract", function () {
   
 
   let owner; //0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
@@ -143,7 +143,7 @@ describe("Integration tests: Vault Synths contract", function () {
         console.log('Block Index at start ', await provider.getBlockNumber());
         const Synthetix_owner = addresses.optimism.Synth_Owner;
         //console.log("PROVIDER ", provider);  
-        let donerAmount = ethers.utils.parseEther('1000000'); //$1million sUSD;
+        let donerAmount = ethers.utils.parseEther('500000'); //$1million sUSD;
         
         //borrow collateral tokens from doner addresses 
         impersonateForToken(provider, owner, sUSD, sUSDDoner, donerAmount)
