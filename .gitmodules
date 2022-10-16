@@ -1,0 +1,3 @@
+[submodule "Velo-Deposit-Tokens"]
+	path = Velo-Deposit-Tokens
+	url = https://github.com/kree-dotcom/Velo-Deposit-Tokens
