@@ -17,8 +17,6 @@ import "hardhat/console.sol";
 //Open Zeppelin dependancies
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 //Time delayed governance
 import "./RoleControl.sol";
@@ -107,7 +105,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     } 
 
     /**
-        External onlyOwner governance functions
+        External onlyAdmin or onlyPauser governance functions
      */
 
 
@@ -253,7 +251,10 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         _checkDailyMaxLoans(_loanAmount);
         (userMint, userOpenFee) = _findFees(loanOpenFee, _loanAmount);
         moUSD.mint(_loanAmount);
+        //moUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(msg.sender, userMint);
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(address(treasury), userOpenFee);
     }
     /// @dev internal function used to increase user collateral on loan.
@@ -274,10 +275,12 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         IERC20 collateral = IERC20(_collateralAddress);
         //_interestPaid is always less thn _USDReturned so this is safe.
         uint256 USDBurning = _USDReturned - _interestPaid;
+        //slither-disable-next-line unchecked-transfer
         moUSD.transferFrom(msg.sender, address(this), _USDReturned);
         //burn original loan principle
         moUSD.burn(address(this), USDBurning);
         //transfer interest earned on loan to treasury
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(address(treasury), _interestPaid);
         bool success = collateral.transfer(msg.sender, _amount);
         require(success, "collateral transfer failed");
@@ -337,6 +340,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_USDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); //CHANGED HERE MIN LOAN OF 100
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);  
         
         (   
@@ -386,6 +390,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
         require(_colAmount > 0 , "Zero amount"); //Not strictly needed, prevents event spamming though
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);
         IERC20 collateral = IERC20(_collateralAddress);
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral amount");
@@ -434,6 +439,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         {
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);
         (   
             bytes32 currencyKey,
@@ -457,6 +463,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         }
 
         //record paying off loan principle before interest
+        //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         uint256 loanPrinciple = moUSDLoaned[_collateralAddress][msg.sender];
         if( loanPrinciple >= _USDToVault){
@@ -495,6 +502,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         //IERC20 collateral = IERC20(_collateralAddress);
         //record paying off loan principle before interest
             uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
+            //slither-disable-next-line uninitialized-local-variables
             uint256 interestPaid;
             if( loanPrinciple >= _moUSDReturned){
                 //pay off loan principle first
@@ -564,6 +572,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         {   
             require(_loanHolder != address(0), "Zero address used"); 
              //make sure virtual price is related to current time before fetching collateral details
+            //slither-disable-next-line reentrancy-vulnerabilities-1
             _updateVirtualPrice(block.timestamp, _collateralAddress);
             (
                 bytes32 currencyKey,

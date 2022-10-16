@@ -1,9 +1,9 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { helpers } = require("./testHelpers.js")
+const { helpers } = require("../testHelpers.js")
 
 
-describe("Treasury contract", function () {
+describe("Unit test: Treasury contract", function () {
   let snapshotId;
   const provider = ethers.provider;
 

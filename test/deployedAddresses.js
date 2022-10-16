@@ -35,6 +35,18 @@ const Lyra_Doner = `0x9644A6920bd0a1923C2C6C1DddF691b7a42e8A65`
 const USDC = `0x7F5c764cBc14f9669B88837ca1490cCa17c31607` 
 const router = "0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9"
 const chainlink_SUSD_feed = "0x7f99817d87baD03ea21E05112Ca799d715730efe"
+const VELO = "0x3c8B650257cFb5f272f799F5e2b4e65093a11a05"
+const Velo_Voter = "0x09236cfF45047DBee6B921e00704bed6D6B8Cf7e"
+const Velo_Voting_Escrow = "0x9c7305eb78a432ced5C4D14Cac27E8Ed569A2e26"
+const Velo_Rewards_Distributor = "0x5d5Bea9f0Fc13d967511668a60a3369fD53F784F"
+const Velo_Router = "0x9c12939390052919aF3155f41Bf4160Fd3666A6f"
+const Velo_Doner = "0x9a69A19f189585dA168C6f125aC23Db866CAFF11"//"0x85A729033Ea3aC6Fab6ca0111E587DBa45F753f0"
+const sAMM_USDC_sUSD = "0xd16232ad60188B68076a235c65d692090caba155"
+const gauge_USDC_SUSD = "0xb03f52D2DB3e758DD49982Defd6AeEFEa9454e80"
+const vAMM_VELO_OP = "0xFFD74EF185989BFF8752c818A53a47FC45388F08"
+const OP_Token = "0x4200000000000000000000000000000000000042"
+
+
 
 //optimism kovan addresses Depreciated testnet, blank addresses are ones we need to control so are useless
 const sUSD_kOP = `0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57`;
@@ -81,7 +93,16 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
                             Lyra_Doner: Lyra_Doner,
                             USDC: USDC, Router: router,
-                            Chainlink_SUSD_Feed : chainlink_SUSD_feed }
+                            Chainlink_SUSD_Feed : chainlink_SUSD_feed,
+                            VELO : VELO, Velo_Voter : Velo_Voter, 
+                            Velo_Voting_Escrow : Velo_Voting_Escrow,
+                            Velo_Rewards_Distributor : Velo_Rewards_Distributor,
+                            Velo_Router : Velo_Router,
+                            Velo_Doner : Velo_Doner,
+                            sAMM_USDC_sUSD : sAMM_USDC_sUSD,
+                            gauge_USDC_SUSD : gauge_USDC_SUSD,
+                            vAMM_VELO_OP : vAMM_VELO_OP,
+                            OP_Token : OP_Token }
 
 const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
                             sBTC: sBTC_kOP, Synth_Owner: Synthetix_owner_kOP,

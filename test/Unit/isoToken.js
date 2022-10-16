@@ -1,13 +1,13 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { helpers } = require("./testHelpers.js")
+const { helpers } = require("../testHelpers.js")
 
 const BLOCK_HEIGHT = 13908578; //5th Jan 2022
 
 const TWO_YEARS = 2*365*24*60*60; //2 years in seconds
 const tokenAmount = ethers.utils.parseEther('10000000'); //10 million
 
-describe("isoToken contract", function () {
+describe("Unit tests: isoToken contract", function () {
   let snapshotId;
   const provider = ethers.provider;
 

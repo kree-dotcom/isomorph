@@ -30,7 +30,7 @@ As borrowers will wish to use their MoUSD on other DeFi protocols it will vital 
 Begin by cloning the repo,
 Then run "yarn install" in the main directory to install all required packages
 connect your API endpoints and privatekey using the .env file. See sample_env for details.
-If you swap to a different network you will need to update the static addresses listed in contracts/vault.sol lines 63-90.
+If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
 Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, 
 if this happens run again.
 
@@ -38,7 +38,7 @@ if this happens run again.
 
 - synths: Any token offered by the Synthetix protocol, they are synthetic assets where their prices track the underlying original token/stock/commodity/currency. Redemption into any other synth is guaranteed by  SNX stakers who assume the debt pool risk ensuring the value of all issued synths. 
 
-- sUSD:  A synth, tracking the US dollar. Generally used as a gateway into and out of the Synthetix ecosystem owing to it's stable price and inclusion in a Curve pool with other popular stablecoins USDC, USDT and Dai.
+- sUSD:  A synth, based on the US dollar. Generally used as a gateway into and out of the Synthetix ecosystem owing to its stable price and inclusion in a Curve pool with other popular stablecoins USDC, USDT and Dai.
 
 - Metapool: a liquidity pool design from Curve.fi comprised of a unique stablecoin attached to the 3pool Dai, USDC USDT Curve.fi liquidity pool design in order to provide a simple route into and out of the unique stablecoin. 
 

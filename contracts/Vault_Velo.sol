@@ -14,8 +14,6 @@ import "./interfaces/IDepositReceipt.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "./RoleControl.sol";
 
@@ -28,10 +26,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    uint256 private constant LOWER_LIQUIDATION_BAND = 95 ether /100; //95% used to determine if liquidation is close to needed value
     uint256 private constant LOAN_SCALE = 1 ether; //base for division/decimal maths
-    uint256 private constant NOT_OWNED = 999; //used to determine if a user owns an NFT, 
-    uint256 private constant NO_NFT_RETURNED = 888;
+    uint256 private constant NOT_OWNED = 999; //used to determine if a user owns an NFT
+
     //users can only hold 8 NFTS relating to a loan so returning 999 is clearly out of bounds, not owned. 888 is no NFT to return, also out of bounds.
     uint256 private constant NFT_LIMIT = 8; //the number of slots available on each loan for storing NFTs, used as loop bound. 
     uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
@@ -65,12 +62,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     uint256 public dayCounter = block.timestamp;
     uint256 public dailyTotal = 0;
 
-    //These two handle the opening fee paid to the protocol by users 
-    uint256 public constant loanOpenFee = 1 ether /100; //1 percent opening fee.
-
-
-    //Mainnet addresses
-    
+    //This handles the opening fee paid to the protocol by users 
+    uint256 public loanOpenFee = 1 ether /100; //1 percent opening fee.
+ 
    
 
     
@@ -82,13 +76,22 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     
     event OpenOrIncreaseLoanNFT(address indexed user, uint256 loanTaken, bytes32 indexed collateralToken, uint256 collateralAmount); 
     event IncreaseCollateralNFT(address indexed user, bytes32 indexed collateralToken, uint256 collateralAmount); 
+    
     event ClosedLoanNFT(address indexed user, uint256 loanAmountReturned, bytes32 indexed collateralToken, uint256 returnedCapitaltoUser);
     event LiquidationNFT(address indexed loanHolder, address indexed Liquidator, uint256 loanAmountReturned, bytes32 indexed collateralToken, uint256 liquidatedCapital);
     event BadDebtClearedNFT(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
+    
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
+    event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
 
     event SystemPaused(address indexed pausedBy);
     event SystemUnpaused(address indexed unpausedBy);
+    
+
+
+    /**
+     * modifiers and 'modifiers' two modifiers were turned into internal functions due to contract size constraints.
+     */
 
     /// @notice basic checks to verify collateral being used exists and sanity check for loan holder
     /// @dev should be called by any external function modifying another users loan in some way
@@ -129,7 +132,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     } 
 
     /**
-        External onlyOwner governance functions
+        External restricted governance functions
      */
 
 
@@ -150,6 +153,13 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         emit ChangeDailyMax(_dailyMax, dailyMax);
         dailyMax = _dailyMax;
         
+    }
+
+    /// @notice openLoanFee can be set to 10% max, fee applied to all loans on opening
+    function setOpenLoanFee(uint256 _newOpenLoanFee) external onlyAdmin {
+        require(_newOpenLoanFee <= 1 ether /10 ); 
+        emit ChangeOpenLoanFee(_newOpenLoanFee, loanOpenFee);  
+        loanOpenFee = _newOpenLoanFee;
     }
 
     //function required to receive ERC721s to this contract
@@ -187,6 +197,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function _totalCollateralValue(address _collateralAddress, address _owner) internal view returns(uint256){
         NFTids memory userNFTs = loanNFTids[_collateralAddress][_owner];
         IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
+        //slither-disable-next-line uninitialized-local-variables
         uint256 totalPooledTokens;
         for(uint256 i =0; i < NFT_LIMIT; i++){
             //check if each slot contains an NFT
@@ -261,7 +272,10 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
         moUSD.mint(_loanAmount);
+        //moUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(msg.sender, userMint);
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(address(treasury), loanFee);
     }
     /// @dev internal function used to increase user collateral on loan.
@@ -291,10 +305,12 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         if (_USDReturned != 0){
             //_interestPaid is always less thn _USDReturned so this is safe.
             uint256 USDBurning = _USDReturned - _interestPaid;
+            //slither-disable-next-line unchecked-transfer
             moUSD.transferFrom(msg.sender, address(this), _USDReturned);
             //burn original loan principle
             moUSD.burn(address(this), USDBurning);
             //transfer interest earned on loan to treasury
+            //slither-disable-next-line unchecked-transfer
             moUSD.transfer(address(treasury), _interestPaid);
         }
         _returnAndSplitNFTs(_collateralAddress, _loanHolder, _loanNFTs, _partialPercentage);
@@ -321,7 +337,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     */
 
 
-    function getLoanNFTids(address _user, address _collateralAddress, uint256 _index) public view returns(uint256){
+    function getLoanNFTids(address _user, address _collateralAddress, uint256 _index) external view returns(uint256){
         return(loanNFTids[_collateralAddress][_user].ids[_index]);
     }
 
@@ -345,7 +361,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) external whenNotPaused  
         {   
             _validMarketConditions(_collateralAddress, msg.sender);
+            //slither-disable-next-line uninitialized-local-variables
             IDepositReceipt depositReceipt;
+            //slither-disable-next-line uninitialized-local-variables
             uint256 addedValue;
             if(_addingCollateral){
                 //zero indexes cause problems with mappings and ownership, so refuse them
@@ -512,6 +530,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         }
 
         //record paying off loan principle before interest
+        //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         {
         //uint256 loanPrinciple = moUSDLoaned[_collateralAddress][msg.sender];
@@ -546,7 +565,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         CollateralNFTs memory _loanNFTs, 
         uint256 _partialPercentage
         ) internal view returns(uint256){
-
+        //slither-disable-next-line uninitialized-local-variables
         uint256 proposedLiquidationAmount;
         for(uint256 i = 0; i < NFT_LIMIT; i++){
                 if(_loanNFTs.slots[i] < NFT_LIMIT){
@@ -580,8 +599,8 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
         NFTids storage userNFTs = loanNFTids[_collateralAddress][_loanHolder];
         for(uint256 i = 0; i < NFT_LIMIT; i++){
-             //then we check this slot is being used, if not the id is `NOT_OWNED`
-            if (_loanNFTs.ids[i] < NFT_LIMIT){
+             //then we check this slot is being used, if not the slot number should be set to `NOT_OWNED`
+            if (_loanNFTs.slots[i] < NFT_LIMIT){
                 //final slot is NFT that will be split if necessary, we skip this loop if partialPercentage = 100% or 0%
                 if((i == NFT_LIMIT -1) && (_partialPercentage > 0) && (_partialPercentage < LOAN_SCALE) ){
                     //split the NFT based on the partialPercentage proposed
@@ -608,6 +627,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) internal {
         //record paying off loan principle before interest
         uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
+        //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         if( loanPrinciple >= _moUSDReturned){
             //pay off loan principle first
@@ -675,13 +695,13 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
       * @notice Anyone can liquidate any other undercollateralised loan.
       * @notice The max acceptable liquidation quantity is calculated using viewLiquidatableAmount
       * @notice this prevents full liquidation when partial liquidation would return recollaterize the loanHolder's debt 
-      * @dev caller is paid 1-`LIQUIDATION_RETURN` as reward for calling the liquidation.
+      * @dev caller is paid 100-`LIQUIDATION_RETURN` percent as reward for calling the liquidation.
       * @dev In the event of full liquidation being insufficient the leftover debt is written off and an event tracking this is emitted.
       * @param _loanHolder address of loanee being liquidated.
       * @param _collateralAddress address of collateral token being used.
       * @param _loanNFTs structure containing the loan's NFT ids and the related slot it is stored in,
       * @dev don't trust user input for this, always verify the ids match the user given slot before using.
-      * @notice the 4th nftId slot is always used for the partially liquidating NFT (if any exists)
+      * @notice the 8th nftId slot is always used for the partially liquidating NFT (if any exists)
       * @param _partialPercentage percentage of the partialNFT that will be liquidated (0-100%) 
       *                           expressed in LOAN_SCALE (i.e. 1 eth = 100%)
      */
@@ -719,8 +739,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             
                 proposedLiquidationAmount = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
                 require(proposedLiquidationAmount <= liquidationAmount, "excessive liquidation suggested");
-                //require(proposedLiquidationAmount >= (liquidationAmount*LOWER_LIQUIDATION_BAND)/LOAN_SCALE, "Liquidation suggested too small");
-                //is it safe to not have a lower bound for liquidation?
+                
             }
             uint256 moUSDreturning = proposedLiquidationAmount*LIQUIDATION_RETURN/LOAN_SCALE;
             

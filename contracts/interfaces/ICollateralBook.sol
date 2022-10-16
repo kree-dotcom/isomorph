@@ -13,7 +13,7 @@ interface ICollateralBook {
         uint256 assetType;
     }
 
-  function collateralProps(address) external returns(Collateral memory);
+  function collateralProps(address) external view returns(Collateral memory);
     
   function ADMIN_ROLE (  ) external view returns ( bytes32 );
   function DEFAULT_ADMIN_ROLE (  ) external view returns ( bytes32 );
@@ -21,6 +21,7 @@ interface ICollateralBook {
   function THREE_MIN (  ) external view returns ( uint256 );
   function TIME_DELAY (  ) external view returns ( uint256 );
   function VAULT_ROLE (  ) external view returns ( bytes32 );
+  function CHANGE_COLLATERAL_DELAY() external view returns ( uint256 );
   function actionNonce (  ) external view returns ( uint256 );
   function action_queued ( bytes32 ) external view returns ( uint256 );
   function addCollateralType ( address _collateralAddress, bytes32 _currencyKey, uint256 _minimumRatio, uint256 _liquidationRatio, uint256 _interestPer3Min, uint256 _assetType, address _liquidityPool ) external;

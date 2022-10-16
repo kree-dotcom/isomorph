@@ -38,20 +38,52 @@ const ERC20 = [
 
   const Router = [
     "function quoteRemoveLiquidity(address, address, bool, uint256) external view returns(uint256, uint256)",
-    "function getAmountOut(uint256, address, address) external view returns(uint256, bool)"
+    "function getAmountOut(uint256, address, address) external view returns(uint256, bool)",
+    "function swapExactTokensForTokensSimple(uint256 amountIn, uint256 amountOutMin, address tokenFrom, address tokenTo, bool stable, address to, uint256 deadline) external returns(uint256)"
   ]
 
   const PriceFeed = [
     "function latestRoundData() external view returns(uint80, int256, uint256, uint256, uint80)"
   ]
 
-  ABIs = {ERC20: ERC20, 
+  const Voter  = [
+    "function claimable(address) external view returns(uint256)",
+    "function external_bribes(address) external view returns(address)",
+    "function gauges(address pool) external view returns(address)",
+    "function internal_bribes(address) external view returns(address)",
+    "event Voted(address, uint256, uint256)"
+  ]
+
+  const Voting_Escrow = [
+    "function balanceOfNFT(uint256) external view returns(uint256)",
+    "function ownerOf(uint256) external view returns(address)",
+    "function locked(uint256) external view returns(uint256)",
+    "event Withdraw(address, uint256, uint256, uint256)",
+    "event Supply(uint256, uint256)",
+    "event Transfer(address, address uint256)"
+  ]
+
+  const External_Bribe = [
+    "function earned(address, uint256) external view returns(uint256)",
+    "function numCheckpoints(uint256) external view returns(uint256)",
+    "function getPriorBalanceIndex(uint, uint) external view returns (uint)",
+    "function lastEarn(address, uint) external view returns (uint)"
+  ]
+
+  
+
+  ABIs = {
+          ERC20: ERC20, 
           SynthSystem: SynthSystem, 
           LyraLP :LyraLP, 
           GreekCache : GreekCache,
           OptionMarket : OptionMarket,
           Router : Router,
-          PriceFeed : PriceFeed}
+          PriceFeed : PriceFeed,
+          Voter : Voter,
+          Voting_Escrow : Voting_Escrow,
+          External_Bribe : External_Bribe
+          }
   module.exports = { ABIs }
 
   

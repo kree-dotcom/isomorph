@@ -41,7 +41,6 @@ describe("Integration tests: Vault_Velo contract", function () {
   
   const testCode = ethers.utils.formatBytes32String("test");
   const sUSDCode = ethers.utils.formatBytes32String("sUSD");
-  //const NFTCode = ethers.utils.formatBytes32String("VELO1");
   const NFTCode = ethers.utils.formatBytes32String("sAMM-USDC-sUSD"); //name format volatile/stable AMM-token0-token1
   const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
   const addingCollateral = true;
@@ -377,7 +376,6 @@ describe("Integration tests: Vault_Velo contract", function () {
       //check debt after timestep was recorded correctly.
       const virtualDebtBalance = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address);
       let virtualPriceUpdate = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address); 
-      console.log("virtul price after ", virtualPriceUpdate)
       const debt = loanTaken.mul(base).div(virtualPriceUpdate);
       expect(virtualDebtBalance).to.equal(debt);
 
@@ -762,7 +760,7 @@ describe("Integration tests: Vault_Velo contract", function () {
         
     });
 
-    it("Should return user moUSD if valid conditions are met and emit ClosedLoan event", async function () {
+    it("Should return user collateral if valid conditions are met and emit ClosedLoan event", async function () {
       const NFTId = 1;
       let timeJump = timeSkipRequired(1.0001);
       await cycleVirtualPrice(timeJump, depositReceipt);
@@ -965,7 +963,8 @@ describe("Integration tests: Vault_Velo contract", function () {
       //check details of new generated NFT
       const newPooledTokens = await depositReceipt.pooledTokens(newNFTId)
       const newNFTValue = await depositReceipt.priceLiquidity(newPooledTokens)
-      expect(newNFTValue).to.equal(capitalReturned)
+      let error = newNFTValue.div(1000000) // 0.0001% deviance is acceptable error
+      expect(newNFTValue).to.be.closeTo(capitalReturned, error)
     });
 
      

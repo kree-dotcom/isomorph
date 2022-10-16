@@ -60,6 +60,8 @@ contract Locker is ConfirmedOwnerWithProposal(msg.sender, address(0)) {
     **/
     function lockVELO(uint256 _tokenAmount, uint256 _lockDuration) external onlyOwner {
         //approve transfer of VELO to votingEscrow contract, bad pattern, prefer increaseApproval but VotingEscrow is not upgradable so should be ok
+        //VELO.approve returns true always so it is of no use.
+        //slither-disable-next-line unused-return
         velo.approve(address(votingEscrow), _tokenAmount);
         //create lock
         uint256 NFTId = votingEscrow.create_lock(_tokenAmount, _lockDuration);
@@ -190,6 +192,8 @@ contract Locker is ConfirmedOwnerWithProposal(msg.sender, address(0)) {
     *    @param _tokenIds The array of ids of the veNFT tokens that we are claiming for 
     **/
     function claimRebaseMultiNFTs(uint256[] calldata _tokenIds) external {
+        //claim_many always returns true unless a tokenId = 0 so return bool is not needed
+        //slither-disable-next-line unused-return
        rewardsDistributor.claim_many(_tokenIds);
        emit ClaimedRebases(_tokenIds, block.timestamp);
     }

@@ -1,14 +1,14 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { addresses } = require("./deployedAddresses.js")
-const { helpers } = require("./testHelpers.js")
+const { addresses } = require("../deployedAddresses.js")
+const { helpers } = require("../testHelpers.js")
 
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
   
   
-  describe("CollateralBook contract", function () {
+  describe("Unit tests: CollateralBook contract", function () {
     const SYNTH = 1; //collateral identifer enum
     const LYRA = 2;
     const threeMinInterest = 100000180
@@ -36,7 +36,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
     before(async function () {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
         collateralContract = await ethers.getContractFactory("CollateralBook");
-        vaultContract = await ethers.getContractFactory("Vault");
+        vaultContract = await ethers.getContractFactory("Vault_Synths");
         collateralBook = await collateralContract.deploy();
         vault = await vaultContract.deploy(FAKE_ADDR, FAKE_ADDR, collateralBook.address);
         await collateralBook.addVaultAddress(vault.address, SYNTH);

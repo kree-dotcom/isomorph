@@ -91,7 +91,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
       * @param _minimumRatio lowest margin ratio for opening debts with new collateral token
       * @param _liquidationRatio margin ratio at which a loan backed by said collateral can be liquidated.
       * @param _interestPer3Min interest charged per block to loan holders using this collateral.
-      * @param _liquidityPool only set for Lyra LP tokens, this address is where price info of the LP token is stored
+      * @param _liquidityPool only set for Lyra LP tokens, this address is where price info of the LP token is stored. The Zero address is used for non-Lyra Collateral
      **/
     function queueCollateralChange(
         address _collateralAddress,

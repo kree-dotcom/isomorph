@@ -17,8 +17,6 @@ import "hardhat/console.sol";
 //Open Zeppelin dependancies
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-//import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 //Time delayed governance
 import "./RoleControl.sol";
@@ -43,7 +41,6 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    uint256 private constant LOWER_LIQUIDATION_BAND = 9 ether /10; //90% used to determine if smaller liquidations are viable
     uint256 private constant LOAN_SCALE = 1 ether; //base for division/decimal maths
     uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
@@ -59,54 +56,32 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     uint256 public dailyTotal = 0;
 
     //These two handle fees paid to liquidators and the protocol by users 
-    uint256 public feePaid = 20 ether /100; //fee paid to users calling liquidation
     uint256 public loanOpenFee = 1 ether /100; //1 percent opening fee.
 
    
-    //Kovan addresses
-    /*
-    address public constant EXCHANGE_RATES = 0xEb3A9651cFaE0eCAECCf8c8b0581A6311F6C5921;
-    address public constant PROXY_ERC20 = 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F;
-    address public constant SUSD_ADDR = 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51;
-    address public constant SYSTEM_STATUS = 0xcf8B3d452A56Dab495dF84905655047BC1Dc41Bc;
-    */
-
-    //Mainnet addresses
-    /*
-    address public constant EXCHANGE_RATES = 0xd69b189020EF614796578AfE4d10378c5e7e1138;
-    address public constant PROXY_ERC20 = 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F;
-    address public constant SUSD_ADDR = 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51;
-    address public constant SYSTEM_STATUS = 0x1c86B3CDF2a60Ae3a574f7f71d44E2C50BDdB87E;
-    */
-    //Optimism Kovan addresses
-    /*
-    address public constant EXCHANGE_RATES = 0x37488De9A5Eaf311840D4B21a5B35A16bcb69603;
-    address public constant PROXY_ERC20 = 0x0064A673267696049938AA47595dD0B3C2e705A1;
-    address public constant SUSD_ADDR = 0xaA5068dC2B3AADE533d3e52C6eeaadC6a8154c57;
-    address public constant SYSTEM_STATUS = 0xE90F90DCe5010F615bEC29c5db2D9df798D48183;
-    */
+    
     //Optimism Mainnet addresses
-    /*
+    
     address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
     address public constant PROXY_ERC20 = 0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4;
     address public constant SUSD_ADDR = 0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9;
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
-    */
-    //Optimism Goerli addresses
     
+    //Optimism Goerli addresses
+    /*
     address public constant EXCHANGE_RATES = 0x280E5dFaA78CE685a846830bAe5F2FD21d6A3D89;
     address public constant PROXY_ERC20 = 0x2E5ED97596a8368EB9E44B1f3F25B2E813845303;
     address public constant SUSD_ADDR = 0xeBaEAAD9236615542844adC5c149F86C36aD1136;
     address public constant SYSTEM_STATUS = 0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916;
-    
+    */
     
     ITreasury treasury;
     IMoUSDToken moUSD;
     ICollateralBook collateralBook;
-    ISynthetix synthetix = ISynthetix(PROXY_ERC20);
+    
     IExchangeRates synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
     ISystemStatus synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);
-    IERC20 SUSD = IERC20(SUSD_ADDR);
+   
     
    
 
@@ -152,7 +127,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     } 
 
     /**
-        External onlyOwner governance functions
+        External onlyAdmin or onlyPauser governance functions
      */
 
 
@@ -290,7 +265,10 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
         moUSD.mint(_loanAmount);
+        //moUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(msg.sender, userMint);
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(address(treasury), loanFee);
     }
     /// @dev internal function used to increase user collateral on loan.
@@ -311,10 +289,12 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         IERC20 collateral = IERC20(_collateralAddress);
         //_interestPaid is always less thn _USDReturned so this is safe.
         uint256 USDBurning = _USDReturned - _interestPaid;
+        //slither-disable-next-line unchecked-transfer
         moUSD.transferFrom(msg.sender, address(this), _USDReturned);
         //burn original loan principle
         moUSD.burn(address(this), USDBurning);
         //transfer interest earned on loan to treasury
+        //slither-disable-next-line unchecked-transfer
         moUSD.transfer(address(treasury), _interestPaid);
         bool success = collateral.transfer(msg.sender, _amount);
         require(success, "collateral transfer failed");
@@ -366,6 +346,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_USDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); 
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);  
         
         (   
@@ -416,6 +397,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
         require(_colAmount > 0 , "Zero amount"); //Not strictly needed, prevents event spamming though
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);
         IERC20 collateral = IERC20(_collateralAddress);
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral amount");
@@ -464,6 +446,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         {
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
         //make sure virtual price is related to current time before fetching collateral details
+        //slither-disable-next-line reentrancy-vulnerabilities-1
         _updateVirtualPrice(block.timestamp, _collateralAddress);
         (   
             bytes32 currencyKey,
@@ -487,6 +470,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         }
         
         //record paying off loan principle before interest
+        //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         uint256 loanPrinciple = moUSDLoaned[_collateralAddress][msg.sender];
         if( loanPrinciple >= _USDToVault){
@@ -524,6 +508,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         //IERC20 collateral = IERC20(_collateralAddress);
         //record paying off loan principle before interest
             uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
+            //slither-disable-next-line uninitialized-local-variables
             uint256 interestPaid;
             if( loanPrinciple >= _moUSDReturned){
                 //pay off loan principle first
@@ -593,6 +578,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         {   
             require(_loanHolder != address(0), "Zero address used"); 
              //make sure virtual price is related to current time before fetching collateral details
+            //slither-disable-next-line reentrancy-vulnerabilities-1
             _updateVirtualPrice(block.timestamp, _collateralAddress);
             (
                 bytes32 currencyKey,

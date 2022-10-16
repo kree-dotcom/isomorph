@@ -3,7 +3,8 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { helpers } = require("../testHelpers.js")
 const { addresses } = require("../deployedAddresses.js")
-const { ABIs } = require("../abi.js")
+const { ABIs } = require("../abi.js");
+const { Router } = require("@uniswap/sdk");
 
 async function impersonateForToken(provider, receiver, ERC20, donerAddress, amount) {
     await network.provider.request({
@@ -42,10 +43,12 @@ describe("Integration tests: Locker contract", function() {
     const VELO_address = addresses.optimism.VELO
     const voter_address = addresses.optimism.Velo_Voter
     const voting_escrow_address = addresses.optimism.Velo_Voting_Escrow
+    const router_address = addresses.optimism.Velo_Router
+    const rewards_distributor_address = addresses.optimism.Velo_Rewards_Distributor
     const sAMM_USDC_sUSD = addresses.optimism.sAMM_USDC_sUSD
-    
+    const vAMM_VELO_OP = addresses.optimism.vAMM_VELO_OP
 
-    const VELO_doner = "0x85A729033Ea3aC6Fab6ca0111E587DBa45F753f0" //addresses.optimism.VELO_Doner
+    const VELO_doner = "0x9a69A19f189585dA168C6f125aC23Db866CAFF11" //addresses.optimism.VELO_Doner
     console.log("DONER SETUP ", VELO_doner)
 
     //grab the provider endpoint
@@ -54,7 +57,10 @@ describe("Integration tests: Locker contract", function() {
     VELO = new ethers.Contract(VELO_address, ABIs.ERC20, provider)
     OP = new ethers.Contract(OP_address, ABIs.ERC20, provider)
     voter = new ethers.Contract(voter_address, ABIs.Voter, provider)
+    
     voting_escrow = new ethers.Contract(voting_escrow_address, ABIs.Voting_Escrow, provider)
+    router = new ethers.Contract(router_address, ABIs.Router, provider)
+    
 
     
     
@@ -79,7 +85,7 @@ describe("Integration tests: Locker contract", function() {
         fake_addr = addrs[0].address
         console.log('Block Index at start ', await provider.getBlockNumber())
         //console.log("PROVIDER ", provider);  
-        let doner_amount = ethers.utils.parseEther('20000') //20_000 VELO;
+        let doner_amount = ethers.utils.parseEther('200000') //20_000 VELO;
 
         //borrow VELO tokens from doner addresses 
         impersonateForToken(provider, owner, VELO, VELO_doner, doner_amount)
@@ -87,7 +93,12 @@ describe("Integration tests: Locker contract", function() {
 
         //deploy locker
         Locker = await ethers.getContractFactory("Locker")
-        locker = await Locker.deploy(VELO.address, voter.address, voting_escrow.address)
+        locker = await Locker.deploy(
+            VELO.address, 
+            voter.address, 
+            voting_escrow.address, 
+            rewards_distributor_address
+            )
 
         //transfer VELO tokens to locker
         await VELO.connect(owner).transfer(locker.address, amount.mul(2))
@@ -95,6 +106,8 @@ describe("Integration tests: Locker contract", function() {
         //find external bribe via voter and pool's gauge
         external_bribe_address = await voter.external_bribes(addresses.optimism.gauge_USDC_SUSD)
         external_bribe = new ethers.Contract(external_bribe_address, ABIs.External_Bribe, provider)
+        
+        
     });
 
     beforeEach(async () => {
@@ -286,33 +299,46 @@ describe("Integration tests: Locker contract", function() {
 
     describe("removeERC20Tokens", function() {
         let amount = ethers.utils.parseEther('10000')
-        let withdraw_amount = ethers.utils.parseEther('4000')
+        let withdraw_amount_A = ethers.utils.parseEther('4000')
+        let withdraw_amount_B = ethers.utils.parseEther('5452')
         let ids = []
         before(async function () {
             //deploy ERC20 Tokens
             TESTERC20 = await ethers.getContractFactory("TESTERC20Token")
             token_A = await TESTERC20.deploy("Token A", "TEST")
+            token_B = await TESTERC20.deploy("Token B", "TEST")
             token_A.connect(owner).transfer(locker.address, amount)
+            token_B.connect(owner).transfer(locker.address, amount)
     
         })
 
         it("Should be able to remove accumulated ERC20s from Locker", async function() {
             
-            let balance_before = await token_A.balanceOf(locker.address)
-            await expect(locker.removeERC20Tokens(token_A.address, withdraw_amount))
-                .to.emit(locker, 'RemoveExcessTokens')
-                .withArgs(token_A.address, owner.address, withdraw_amount)
+            let balance_before_A = await token_A.balanceOf(locker.address)
+            let balance_before_B = await token_B.balanceOf(locker.address)
+            await expect(locker.removeERC20Tokens([token_A.address, token_B.address], [withdraw_amount_A, withdraw_amount_B])
+                ).to.emit(locker, 'RemoveExcessTokens').withArgs(token_A.address, owner.address, withdraw_amount_A
+                ).to.emit(locker, 'RemoveExcessTokens').withArgs(token_B.address, owner.address, withdraw_amount_B)
             
             
-            let balance_after = await token_A.balanceOf(locker.address)
-            expect(balance_after).to.equal(balance_before.sub(withdraw_amount))
+            let balance_after_A = await token_A.balanceOf(locker.address)
+            let balance_after_B = await token_B.balanceOf(locker.address)
+            expect(balance_after_A).to.equal(balance_before_A.sub(withdraw_amount_A))
+            expect(balance_after_B).to.equal(balance_before_B.sub(withdraw_amount_B))
 
         });
 
 
         it("Should revert when called by the wrong user", async function() {
-            await expect(locker.connect(alice).removeERC20Tokens(token_A.address, withdraw_amount))
+            await expect(locker.connect(alice).removeERC20Tokens([token_A.address, token_B.address], [withdraw_amount_A, withdraw_amount_B]))
                 .to.be.revertedWith("Only callable by owner")
+            
+
+        });
+
+        it("Should revert when array lengths do not match", async function() {
+            await expect(locker.connect(owner).removeERC20Tokens([token_A.address, token_B.address], [withdraw_amount_A]))
+                .to.be.revertedWith("Mismatched arrays")
             
 
         });
@@ -342,6 +368,7 @@ describe("Integration tests: Locker contract", function() {
             let balance_before = await VELO.balanceOf(locker.address)
             
             let locked_tokens = await voting_escrow.locked(id)
+            console.log("locked tokens ", locked_tokens)
 
             //Do withdrawNFT() call and check emitted event
             await expect(locker.withdrawNFT(id, slot)
@@ -382,13 +409,14 @@ describe("Integration tests: Locker contract", function() {
         let withdraw_amount = ethers.utils.parseEther('4000')
         let ids = []
 
+        //THIS NEEDS FIXING CURRENTLY IT WORKS BUT NO BRIBE TOKENS ARE CLAIMED
         it("Should let anyone call and accumulated bribes for pool voted for by veNFTs", async function() {
             this.timeout(200000)
             //lock VELO as veNFTs
             //lock VELO into two veNFTs before attempting to vote
             await locker.lockVELO(amount, FOUR_YEARS)
             await locker.lockVELO(amount, FOUR_YEARS)
-            console.log("done locking")
+            
             //fetch veNFT IDs
             //console.log("store IDs")
             ids.push(await locker.veNFTIds(0))
@@ -396,10 +424,10 @@ describe("Integration tests: Locker contract", function() {
 
             //vote for pool
             await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
-            console.log("done voting")
+           
             //timeskip into next epoch
             helpers.timeSkip(ONE_WEEK+1)
-            console.log("done tiemskip")
+           
             //view earned bribe
             let bribe_token = OP.address
             
@@ -408,18 +436,170 @@ describe("Integration tests: Locker contract", function() {
 
             let bribe_earned = await external_bribe.earned(bribe_token, ids[0])
 
-            console.log("bribe is ", bribe_earned)
+            console.log("FIRST BRIBE ", bribe_earned)
+            console.log("numcheckpoints ", await external_bribe.numCheckpoints(ids[0]))
+            let timestamp = await external_bribe.lastEarn(OP.address, ids[0])
+            console.log("priorbal idnex ", await external_bribe.getPriorBalanceIndex(ids[0], timestamp))
+
+
             bribe_earned += await external_bribe.earned(bribe_token, ids[1])
 
             let balance_before = await OP.balanceOf(locker.address)
+
             //claim earned bribe
-            console.log("claiming bribe now")
             await locker.connect(alice).claimBribesMultiNFTs([external_bribe.address], [[OP.address]], ids)
 
             let balance_after = await OP.balanceOf(locker.address)
             expect(balance_after).to.equal(balance_before.add(bribe_earned))
         });
 
+    });
+
+    describe("claimFeesMultiNFTs", function() {
+        let amount = ethers.utils.parseEther('10000')
+        let withdraw_amount = ethers.utils.parseEther('4000')
+        let ids = []
+
+        it("Should let anyone call and accumulated fees for pool voted for by veNFTs", async function() {
+            this.timeout(200000)
+            //lock VELO as veNFTs
+            //lock VELO into two veNFTs before attempting to vote
+            await locker.lockVELO(amount, FOUR_YEARS)
+            
+            //fetch veNFT IDs
+            //console.log("store IDs")
+            ids.push(await locker.veNFTIds(0))
+            
+
+            //vote for pool
+            await locker.vote(ids,[vAMM_VELO_OP], [FULL_WEIGHT])
+            
+            //Do pool swap to accumulate fees
+            let amountOutMin = 10
+            let deadline = 1981351922 //year 2032
+            await VELO.connect(owner).approve(router.address, amount)
+            await router.connect(owner).swapExactTokensForTokensSimple(amount, amountOutMin, VELO.address, OP.address, false, owner.address, deadline)
+
+            let balance_before = await VELO.balanceOf(locker.address)
+            let gauge_VELO_OP = await voter.gauges(vAMM_VELO_OP)
+            let internal_bribe_address = await voter.internal_bribes(gauge_VELO_OP)
+            //claim earned bribe
+            await locker.connect(alice).claimFeesMultiNFTs([internal_bribe_address], [[VELO.address]], ids)
+
+            let balance_after = await VELO.balanceOf(locker.address)
+            //check within a check to prevent complaints about expecting a number or data rather than BigNum
+            expect(balance_after.gt(balance_before)).to.equal(true)
+        });
+
+    });
+
+    //This does not work as intended yet, function calls work but no rebase is claimed
+    describe("claimRebaseMultiNFTs", function() {
+        let amount = ethers.utils.parseEther('10000')
+        let withdraw_amount = ethers.utils.parseEther('4000')
+        let ids = []
+
+        it("Should let anyone call and process rebases owned to Locker", async function() {
+            this.timeout(200000)
+            //lock VELO as veNFTs
+            //lock VELO into two veNFTs before attempting to vote
+            await locker.lockVELO(amount, FOUR_YEARS)
+            await locker.lockVELO(amount, FOUR_YEARS)
+            
+            //fetch veNFT IDs
+            //console.log("store IDs")
+            ids.push(await locker.veNFTIds(0))
+            ids.push(await locker.veNFTIds(1))
+
+            //vote for pool
+            await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
+           
+            //timeskip into next epoch
+            helpers.timeSkip(ONE_WEEK+1)
+           
+            //view earned bribe
+            let bribe_token = OP.address
+            
+            //vote in new epoch to trigger checkpoint
+            await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
+
+
+            let balance_before = await VELO.balanceOf(locker.address)
+
+            //claim rebase
+            await locker.connect(alice).claimRebaseMultiNFTs(ids)
+
+            let balance_after = await VELO.balanceOf(locker.address)
+            console.log("Blance after", balance_after)
+            expect(balance_after.gt(balance_before)).to.equal(true)
+        });
+
+    });
+
+    describe("transferNFTs", function() {
+        let amount = ethers.utils.parseEther('1000');
+        let ids = []
+        let indexes = [0,1]
+        beforeEach(async function () {
+            this.timeout(100000)
+            //lock VELO into a veNFT before attempting a relock            
+            await locker.lockVELO(amount, TWO_YEARS)
+            await locker.lockVELO(amount, TWO_YEARS)
+            await locker.lockVELO(amount, TWO_YEARS)
+            //fetch veNFT ID
+            ids = []
+            ids.push(await locker.veNFTIds(0))
+            ids.push(await locker.veNFTIds(1))
+            ids.push(await locker.veNFTIds(2))
+            
+    
+        })
+
+        it("Should transfer NFTs to caller", async function() {
+            
+            //verify ownership prior to test
+            expect( await voting_escrow.ownerOf(ids[0])).to.equal(locker.address)
+
+            //Do transferNFTs() call 
+            await locker.transferNFTs([ids[0]], [0])
+            
+            //verify ownership changed
+            expect( await voting_escrow.ownerOf(ids[0])).to.equal(owner.address)
+
+            //verify ownership prior to test
+            expect( await voting_escrow.ownerOf(ids[1])).to.equal(locker.address)
+            expect( await voting_escrow.ownerOf(ids[2])).to.equal(locker.address)
+            
+            //Do transferNFTs() call
+            await locker.transferNFTs([ids[1], ids[2]], [1,2])
+            
+            //verify ownership of both NFTs changed
+            expect( await voting_escrow.ownerOf(ids[1])).to.equal(owner.address)
+            expect( await voting_escrow.ownerOf(ids[2])).to.equal(owner.address)
+        });
+
+        it("Should revert when indexes do not match veNFT Ids ", async function() {
+            let wrong_indexes = [1,0,2]
+            await expect(locker.connect(owner).transferNFTs(ids, wrong_indexes))
+                .to.be.revertedWith("Wrong index slot")
+            
+
+        });
+
+        it("Should revert when given mismatched array lengths ", async function() {
+            let wrong_indexes = [1,0]
+            await expect(locker.connect(owner).transferNFTs(ids, wrong_indexes))
+                .to.be.revertedWith("Mismatched arrays")
+            
+
+        });
+
+        it("Should revert when called by the wrong user", async function() {
+            await expect(locker.connect(alice).transferNFTs(ids, [0,1,2]))
+                .to.be.revertedWith("Only callable by owner")
+            
+
+        });
     });
     
 
