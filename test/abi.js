@@ -24,8 +24,9 @@ const ERC20 = [
   ];
 
   const LyraLP = [
-    "function CBTimestamp() view returns (uint256)",
-    "function poolHedger() view returns (address)"
+    "function CBTimestamp() external view returns (uint256)",
+    "function poolHedger() external view returns (address)",
+    "function getTokenPriceWithCheck() external view returns(uint256, bool, uint256)"
   ];
 
   const GreekCache = [

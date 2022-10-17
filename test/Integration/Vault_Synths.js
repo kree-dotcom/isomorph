@@ -7,6 +7,7 @@ const { helpers } = require("../testHelpers.js")
 
 
 async function impersonateForToken(provider, receiver, ERC20, donerAddress, amount) {
+  let tokens_before = await ERC20.balanceOf(receiver.address)
   await network.provider.request({
     method: "hardhat_impersonateAccount",
     params: [donerAddress], 
@@ -17,6 +18,8 @@ async function impersonateForToken(provider, receiver, ERC20, donerAddress, amou
     method: "hardhat_stopImpersonatingAccount",
     params: [donerAddress] 
   });
+  let tokens_after = await ERC20.balanceOf(receiver.address)
+  expect(tokens_after).to.equal(tokens_before.add(amount))
   
 }
 
@@ -79,7 +82,7 @@ async function cycleVirtualPrice(steps, collateral) {
 }
 
 
-describe.only("Integration tests: Vault Synths contract", function () {
+describe("Integration tests: Vault Synths contract", function () {
   
 
   let owner; //0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
@@ -1125,7 +1128,7 @@ describe.only("Integration tests: Vault Synths contract", function () {
       const sETHLiqMargin2 = ethers.utils.parseEther("1.0");
       const sETHInterest2 = ethers.utils.parseEther("1.19710969"); //1.001^180 i.e. 3 mins continiously compounding per second
       await collateralBook.TESTchangeCollateralType(sETH.address, sETHCode, sETHMinMargin2, sETHLiqMargin2, sETHInterest2,  ZERO_ADDRESS, liq_return.mul(2), SYNTH);   //fake LIQ_RETURN used for ease of tests   
-      let collateralValue = await vault.priceCollateralToUSD(sETHCode, colQuantity, SYNTH);
+      let collateralValue = await vault.priceCollateralToUSD(sETHCode, colQuantity);
       liquidationLoanSize = collateralValue.div(numerator).mul(divider)
       await vault.connect(addr1).openLoan(sETH.address, colQuantity, liquidationLoanSize); //i.e. 10mill / 1.1 so liquidatable
       const openingVirtualPrice = await collateralBook.viewVirtualPriceforAsset(sETH.address);
@@ -1172,10 +1175,10 @@ describe.only("Integration tests: Vault Synths contract", function () {
       const sETHInterest4 = ethers.utils.parseEther("1.19710969"); //1.001^180 i.e. 3 mins continiously compounding per second
       await collateralBook.TESTchangeCollateralType(sETH.address, sETHCode, sETHMinMargin4, sETHLiqMargin4, sETHInterest4, ZERO_ADDRESS, liq_return, SYNTH);      
       
-      const totalCollateralinMOUSD = await vault.priceCollateralToUSD(sETHCode, colQuantity, SYNTH); //Math.round(ethPrice * colQuantity);
+      const totalCollateralinMOUSD = await vault.priceCollateralToUSD(sETHCode, colQuantity); //Math.round(ethPrice * colQuantity);
       const amountLiquidated = totalCollateralinMOUSD.mul(base.sub(liquidatorFeeBN)).div(base); 
       const virtualDebtBegin = await vault.moUSDLoanAndInterest(sETHaddr, addr1.address);
-      ethPriceBN =  await vault.priceCollateralToUSD(sETHCode, e18, SYNTH);
+      ethPriceBN =  await vault.priceCollateralToUSD(sETHCode, e18);
       let moUSDRepaid = await vault.viewLiquidatableAmount(colQuantity, ethPriceBN, loanSizeInMoUSD, sETHLiqMargin4)
       
        //moUSD repayment approval and liquidation call
@@ -1240,7 +1243,7 @@ describe.only("Integration tests: Vault Synths contract", function () {
 
       const beforeColBalance = await sETH.balanceOf(addr2.address);
       expect(beforeColBalance).to.equal(0);
-      ethPriceBN = await vault.priceCollateralToUSD(sETHCode, e18, SYNTH);
+      ethPriceBN = await vault.priceCollateralToUSD(sETHCode, e18);
 
       //change collateral parameters to force partial liquidation being possible
       const sETHMinMargin5 = ethers.utils.parseEther("2.0");
@@ -1256,7 +1259,7 @@ describe.only("Integration tests: Vault Synths contract", function () {
       const virtualPriceEnd = await collateralBook.viewVirtualPriceforAsset(sETH.address);
       const realLoanOwed = virtualDebtBegin.mul(virtualPriceEnd).div(e18);
       const liquidateCollateral = await vault.viewLiquidatableAmount(colQuantity, ethPriceBN, realLoanOwed, sETHLiqMargin5)
-      const liquidatorPayback = (await vault.priceCollateralToUSD(sETHCode, liquidateCollateral, SYNTH)).mul(base.sub(liquidatorFeeBN)).div(base); 
+      const liquidatorPayback = (await vault.priceCollateralToUSD(sETHCode, liquidateCollateral)).mul(base.sub(liquidatorFeeBN)).div(base); 
       
       expect (tx).to.emit(vault, 'Liquidation').withArgs(addr1.address, addr2.address, liquidatorPayback, sETHCode, liquidateCollateral);  
       const AfterMoUSDBalance = await moUSD.balanceOf(addr2.address);

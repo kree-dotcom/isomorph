@@ -1,4 +1,6 @@
-//SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
+// Vault_Synths.sol for isomorph.loans
+// Bug bounties available
 
 pragma solidity =0.8.9; 
 pragma abicoder v2;
@@ -168,13 +170,9 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @dev leverages synthetix system to verify that the collateral in question is currently trading
     /// @dev this prevents people frontrunning closed weekend markets for expected price crashes etc
     /// @notice this call verifies Synthetix system, exchange and the synths in question are all available.
-
-    /// @dev process for Lyra LP assets
-    /// @dev this uses the liquidity Pool associated with the LP token to verify the circuit breaker is not active
-    /// @dev to be overly cautious if the CB is active we revert
     /// @notice if any of them aren't the function will revert.
     /// @param _currencyKey the code used by synthetix to identify different synths, linked in collateral structure to collateral address
-    function _checkIfCollateralIsActive(bytes32 _currencyKey, AssetType _assetType) internal view {
+    function _checkIfCollateralIsActive(bytes32 _currencyKey) internal view {
              synthetixSystemStatus.requireExchangeBetweenSynthsAllowed(_currencyKey, SUSD_CODE);
          
     }
@@ -287,7 +285,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @param _interestPaid quantity of interest paid on closing loan, this is transfered to the treasury , this can be zero
     function _decreaseLoan(address _collateralAddress, uint256 _amount, uint256 _USDReturned, uint256 _interestPaid) internal {
         IERC20 collateral = IERC20(_collateralAddress);
-        //_interestPaid is always less thn _USDReturned so this is safe.
+        //_interestPaid is always less than _USDReturned so this is safe.
         uint256 USDBurning = _USDReturned - _interestPaid;
         //slither-disable-next-line unchecked-transfer
         moUSD.transferFrom(msg.sender, address(this), _USDReturned);
@@ -319,7 +317,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
     /// @param _amount quantity of collateral to price into sUSD
     /// @return returns the value of the given synth in sUSD which is assumed to be pegged at $1.
-    function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount, AssetType _assetType) public view returns(uint256){
+    function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount) public view returns(uint256){
         //As it is a synth use synthetix for pricing
         return (synthetixExchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE));      
     }
@@ -356,13 +354,13 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
 
         //make sure the total moUSD borrowed doesn't exceed the opening borrow margin ratio
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender], assetType);
+        uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender]);
         uint256 totalUSDborrowed = _USDborrowed +  (moUSDLoaned[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
@@ -408,13 +406,13 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
         //debatable check begins here 
         uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat, assetType);
+        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat);
         uint256 USDborrowed = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Liquidation margin not met!");
@@ -455,16 +453,16 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
         uint256 moUSDdebt = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         require( moUSDdebt >= _USDToVault, "Trying to return more moUSD than borrowed!");
         uint256 outstandingMoUSD = moUSDdebt - _USDToVault;
         if(outstandingMoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
-            uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft, assetType); 
+            uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingMoUSD * minOpeningMargin) / LOAN_SCALE;
             require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
@@ -587,14 +585,14 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
                 ,
                 ,
                 uint256 virtualPrice,
-                AssetType assetType
+                
             ) = _getCollateral(_collateralAddress);
             //check for frozen or paused collateral
-            _checkIfCollateralIsActive(currencyKey, assetType);
+            _checkIfCollateralIsActive(currencyKey);
             //check how much of the specified loan should be closed
             uint256 moUSDBorrowed = (moUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
             uint256 totalUserCollateral = collateralPosted[_collateralAddress][_loanHolder];
-            uint256 currentPrice = priceCollateralToUSD(currencyKey, LOAN_SCALE, assetType); //assumes LOAN_SCALE = 1 ether, i.e. one unit of collateral!
+            uint256 currentPrice = priceCollateralToUSD(currencyKey, LOAN_SCALE); //assumes LOAN_SCALE = 1 ether, i.e. one unit of collateral!
             uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, currentPrice, moUSDBorrowed, liquidatableMargin);
             require(liquidationAmount > 0 , "Loan not liquidatable");
             //if complete liquidation falls short of recovering the position we settle for complete liquidation

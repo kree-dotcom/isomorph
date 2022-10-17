@@ -174,13 +174,13 @@ describe("Integration tests: Vault Lyra contract", function () {
         await collateralBook.addCollateralType(lyraLPToken.address, lyraCode, MinMargin, LiqMargin, Interest, LYRA, lyraLiqPool.address);
         liveBoardIDs = await optionMarket.getLiveBoards();
         //update stale greek caches
-        
         console.log("Updating stale lyra board Greeks.")
         console.log("Please wait this may take some time...")
         for (let i in liveBoardIDs){
           //this is very slow, comment out if not needed
           await greekCache.connect(owner).updateBoardCachedGreeks(liveBoardIDs[i], {gasLimit: 9000000})
         }
+        //console.log("Feedback post ", await lyraLiqPool.getTokenPriceWithCheck())
       });
 
       beforeEach(async () => {
@@ -254,7 +254,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       const startTime = beginBlock.timestamp;
       
       //trigger Lyra CB here by overwriting CBTimestamp in slot 33 of LiquidityPool storage
-      const timestamp = ethers.utils.hexZeroPad(ethers.utils.hexlify(startTime + 100), 32)
+      const timestamp = ethers.utils.hexZeroPad(ethers.utils.hexlify(startTime + 200), 32)
       await network.provider.send("hardhat_setStorageAt", [
         "0x5Db73886c4730dBF3C562ebf8044E19E8C93843e",
         "0x21",
@@ -552,18 +552,20 @@ describe("Integration tests: Vault Lyra contract", function () {
       let initialVirtualPrice = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
       await vault.TESTalterVirtualPrice(lyraLPToken.address, initialVirtualPrice.mul(1050).div(1000)) //5%
 
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
+      const MinMargin = ethers.utils.parseEther("1.8");
+
+      let currentPrice = await vault.priceCollateralToUSD(lyraCode,base)
+      let currentCollateralValue = collateralUsed.mul(currentPrice).div(base)
+      let maxLoanPossible = currentCollateralValue.mul(base).div(MinMargin)
+      let maxLoanIncrease = maxLoanPossible.sub(loanTaken)
       //we request a loan that places us slightly over the maximum loan allowed
-      const loanIncrease = ethers.utils.parseEther('354');
+      const loanIncrease = maxLoanIncrease.mul(102).div(100)
       await expect(vault.connect(addr1).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
       
     });
 
     it("Should fail if the user has no existing loan", async function () {
       
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('300');
       await expect(vault.connect(addr2).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
       
@@ -571,8 +573,6 @@ describe("Integration tests: Vault Lyra contract", function () {
     
     it("Should fail if daily max Loan amount exceeded", async function () {
 
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('300');
       await vault.setDailyMax(1000);
       await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0,loanIncrease)).to.be.revertedWith("Try again tomorrow loan opening limit hit");
@@ -580,15 +580,12 @@ describe("Integration tests: Vault Lyra contract", function () {
     
     it("Should fail if using unsupported collateral token", async function () {
 
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('300');
       await expect(vault.connect(addr1).openLoan(FakeAddr,0, loanIncrease)).to.be.revertedWith("Unsupported collateral!");
     });
 
     it("Should fail if sender requests too much moUSD", async function () {
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
+
       const loanIncrease = ethers.utils.parseEther('3000');
       await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
     });
@@ -716,9 +713,6 @@ describe("Integration tests: Vault Lyra contract", function () {
       const timeToSkip = await collateralBook.CHANGE_COLLATERAL_DELAY()
       await helpers.timeSkip(timeToSkip.toNumber());
       await collateralBook.changeCollateralType();
-      const beforeAddr1Balance = await moUSD.balanceOf(addr1.address);
-      const beforeTreasuryBalance = await moUSD.balanceOf(treasury.address);
-      const beforeAddr1Collateral = await lyraLPToken.balanceOf(addr1.address);
       
       //because the Greeks can't update after very large time periods we use a hack here to set the virtualPrice
       let initialVirtualPrice = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
@@ -775,6 +769,7 @@ describe("Integration tests: Vault Lyra contract", function () {
   describe("CloseLoans", function () {
     collateralAmount = ethers.utils.parseEther("1000");
     loanAmount = collateralAmount.div(2)
+
     beforeEach(async function () {
       
       await lyraLPToken.connect(addr1).approve(vault.address, collateralAmount);
@@ -1176,7 +1171,7 @@ describe("Integration tests: Vault Lyra contract", function () {
         LYRA
         );     
 
-      let collateralValue = await vault.priceCollateralToUSD(lyraCode, colQuantity, LYRA);
+      let collateralValue = await vault.priceCollateralToUSD(lyraCode, colQuantity);
       liquidationLoanSize = collateralValue.div(numerator).mul(divider)
       
       await vault.connect(addr1).openLoan(lyraLPToken.address, colQuantity, liquidationLoanSize); //i.e. 10mill / 1.1 so liquidatable
@@ -1230,10 +1225,10 @@ describe("Integration tests: Vault Lyra contract", function () {
       const Interest4 = ethers.utils.parseEther("1.19710969"); //1.001^180 i.e. 3 mins continiously compounding per second
       await collateralBook.TESTchangeCollateralType(lyraLPToken.address, lyraCode, MinMargin4, LiqMargin4, Interest4, lyraLiqPool.address, liq_return, LYRA);      
       
-      const totalCollateralinMOUSD = await vault.priceCollateralToUSD(lyraCode, colQuantity, SYNTH); //Math.round(ethPrice * colQuantity);
+      const totalCollateralinMOUSD = await vault.priceCollateralToUSD(lyraCode, colQuantity); //Math.round(ethPrice * colQuantity);
       const amountLiquidated = totalCollateralinMOUSD.mul(base.sub(liquidatorFeeBN)).div(base); 
       const virtualDebtBegin = await vault.moUSDLoanAndInterest(lyraLPToken.address, addr1.address);
-      ethPriceBN =  await vault.priceCollateralToUSD(lyraCode, e18, SYNTH);
+      ethPriceBN =  await vault.priceCollateralToUSD(lyraCode, e18);
       await vault.viewLiquidatableAmount(colQuantity, ethPriceBN, loanSizeInMoUSD, LiqMargin4)
       //approve vault to take moUSD from liquidator
       let balance = await moUSD.connect(addr2).balanceOf(addr2.address)
@@ -1297,7 +1292,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       const beforeColBalance = await lyraLPToken.balanceOf(addr2.address);
      
 
-      ethPriceBN = await vault.priceCollateralToUSD(lyraCode, e18, SYNTH);
+      ethPriceBN = await vault.priceCollateralToUSD(lyraCode, e18);
       const MinMargin6 = ethers.utils.parseEther("2.0");
       const LiqMargin6 = ethers.utils.parseEther("1.5");
       await collateralBook.TESTchangeCollateralType(lyraLPToken.address, lyraCode, MinMargin6, LiqMargin6, Interest5, lyraLiqPool.address, liq_return.mul(2), LYRA); //fake LIQ_RETURN used for ease of tests
@@ -1311,7 +1306,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       const virtualPriceEnd = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
       const realLoanOwed = virtualDebtBegin.mul(virtualPriceEnd).div(e18);
       const liquidateCollateral = await vault.viewLiquidatableAmount(colQuantity, ethPriceBN, realLoanOwed, LiqMargin6)
-      const liquidatorPayback = (await vault.priceCollateralToUSD(lyraCode, liquidateCollateral, SYNTH)).mul(base.sub(liquidatorFeeBN)).div(base); 
+      const liquidatorPayback = (await vault.priceCollateralToUSD(lyraCode, liquidateCollateral)).mul(base.sub(liquidatorFeeBN)).div(base); 
       
       expect (tx).to.emit(vault, 'Liquidation').withArgs(addr1.address, addr2.address, liquidatorPayback, lyraCode, liquidateCollateral);  
       

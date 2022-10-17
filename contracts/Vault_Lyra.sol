@@ -1,4 +1,6 @@
-//SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
+// Vault_Lyra.sol for isomorph.loans
+// Bug bounties available
 
 pragma solidity =0.8.9; 
 pragma abicoder v2;
@@ -39,7 +41,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    uint256 private constant LOWER_LIQUIDATION_BAND = 9 ether /10; //90% used to determine if smaller liquidations are viable
+    //uint256 private constant LOWER_LIQUIDATION_BAND = 9 ether /10; //90% used to determine if smaller liquidations are viable
     uint256 private constant LOAN_SCALE = 1 ether; //base for division/decimal maths
     uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
@@ -145,7 +147,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @dev to be overly cautious if the CB is active we revert
     /// @notice if any of them aren't the function will revert.
     /// @param _currencyKey the code used by synthetix to identify different synths, linked in collateral structure to collateral address
-    function _checkIfCollateralIsActive(bytes32 _currencyKey, AssetType _assetType) internal view {
+    function _checkIfCollateralIsActive(bytes32 _currencyKey) internal view {
             
              //Lyra LP tokens use their associated LiquidityPool to check if they're active
              ILiquidityPoolAvalon LiquidityPool = ILiquidityPoolAvalon(collateralBook.liquidityPoolOf(_currencyKey));
@@ -305,7 +307,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
     /// @param _amount quantity of collateral to price into sUSD
     /// @return returns the value of the given collateral in sUSD which is assumed to be pegged at $1.
-    function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount, AssetType _assetType) public view returns(uint256){
+    function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount) public view returns(uint256){
          //The LiquidityPool associated with the LP Token is used for pricing
         ILiquidityPoolAvalon LiquidityPool = ILiquidityPoolAvalon(collateralBook.liquidityPoolOf(_currencyKey));
         //we have already checked for stale greeks so here we call the basic price function.
@@ -350,12 +352,12 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
         //make sure the total moUSD borrowed doesn't exceed the opening borrow margin ratio
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender], assetType);
+        uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender]);
         uint256 totalUSDborrowed = _USDborrowed +  (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
@@ -401,13 +403,13 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
         //debatable check begins here 
         uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat, assetType);
+        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat);
         uint256 USDborrowed = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Liquidation margin not met!");
@@ -448,16 +450,16 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
             ,
             ,
             uint256 virtualPrice,
-            AssetType assetType
+            
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey, assetType);
+        _checkIfCollateralIsActive(currencyKey);
         uint256 moUSDdebt = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         require( moUSDdebt >= _USDToVault, "Trying to return more moUSD than borrowed!");
         uint256 outstandingMoUSD = moUSDdebt - _USDToVault;
         if(outstandingMoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
-            uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft, assetType); 
+            uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingMoUSD * minOpeningMargin) / LOAN_SCALE;
             require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
@@ -581,14 +583,14 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
                 ,
                 ,
                 uint256 virtualPrice,
-                AssetType assetType
+                
             ) = _getCollateral(_collateralAddress);
             //check for frozen or paused collateral
-            _checkIfCollateralIsActive(currencyKey, assetType);
+            _checkIfCollateralIsActive(currencyKey);
             //check how much of the specified loan should be closed
             uint256 moUSDBorrowed = (moUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
             uint256 totalUserCollateral = collateralPosted[_collateralAddress][_loanHolder];
-            uint256 currentPrice = priceCollateralToUSD(currencyKey, LOAN_SCALE, assetType); //assumes LOAN_SCALE = 1 ether, i.e. one unit of collateral!
+            uint256 currentPrice = priceCollateralToUSD(currencyKey, LOAN_SCALE); //assumes LOAN_SCALE = 1 ether, i.e. one unit of collateral!
             uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, currentPrice, moUSDBorrowed, liquidatableMargin);
             require(liquidationAmount > 0 , "Loan not liquidatable");
             //if complete liquidation falls short of recovering the position we settle for complete liquidation
