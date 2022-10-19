@@ -107,7 +107,7 @@ describe("Integration tests: Locker contract", function() {
         await VELO.connect(owner).transfer(locker.address, amount.mul(2))
 
         //find external bribe via voter and pool's gauge
-        external_bribe_address = await voter.external_bribes(addresses.optimism.gauge_USDC_SUSD)
+        external_bribe_address = "0xBee1E4C4276687A8350C2E44eCBe79d676637f86" //await voter.external_bribes(addresses.optimism.gauge_USDC_SUSD)
         external_bribe = new ethers.Contract(external_bribe_address, ABIs.External_Bribe, provider)
         
         
@@ -412,7 +412,7 @@ describe("Integration tests: Locker contract", function() {
         let withdraw_amount = ethers.utils.parseEther('4000')
         let ids = []
 
-        //THIS NEEDS FIXING CURRENTLY IT WORKS BUT NO BRIBE TOKENS ARE CLAIMED
+    
         it("Should let anyone call and accumulated bribes for pool voted for by veNFTs", async function() {
             this.timeout(200000)
             //lock VELO as veNFTs
@@ -439,13 +439,8 @@ describe("Integration tests: Locker contract", function() {
 
             let bribe_earned = await external_bribe.earned(bribe_token, ids[0])
 
-            console.log("FIRST BRIBE ", bribe_earned)
-            console.log("numcheckpoints ", await external_bribe.numCheckpoints(ids[0]))
-            let timestamp = await external_bribe.lastEarn(OP.address, ids[0])
-            console.log("priorbal idnex ", await external_bribe.getPriorBalanceIndex(ids[0], timestamp))
 
-
-            bribe_earned += await external_bribe.earned(bribe_token, ids[1])
+            bribe_earned = bribe_earned.add(await external_bribe.earned(bribe_token, ids[1]))
 
             let balance_before = await OP.balanceOf(locker.address)
 
@@ -528,12 +523,14 @@ describe("Integration tests: Locker contract", function() {
             await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
 
 
-            let balance_before = await VELO.balanceOf(locker.address)
+            let balance_before = await voting_escrow.locked(ids[0])
+            console.log("voting balance ", balance_before)
+
 
             //claim rebase
             await locker.connect(alice).claimRebaseMultiNFTs(ids)
 
-            let balance_after = await VELO.balanceOf(locker.address)
+            let balance_after = await voting_escrow.locked(ids[0])
             console.log("Blance after", balance_after)
             expect(balance_after.gt(balance_before)).to.equal(true)
         });

@@ -16,18 +16,18 @@ This modifier is used to protect functions that should only be called by `Vaults
 ## Function 
 
 - viewVirtualPriceforAsset
-This is a function to assist testing and bots in viewing the `virtualPrice` of a collateral with needing to fetch the entire collateral struct, not strictly needed.
+This is a view function to assist testing and bots in viewing the `virtualPrice` of a collateral with needing to fetch the entire collateral struct, not strictly needed.
 
 - viewLastUpdateTimeforAsset
-This is a function to assist testing and bots in viewing the `lastUpdateTime` of a collateral with needing to fetch the entire collateral struct, not strictly needed.
+This is a view function to assist testing and bots in viewing the `lastUpdateTime` of a collateral with needing to fetch the entire collateral struct, not strictly needed.
 
 - queueCollateralChange
 This is the first call in a 2 stage process of changing an existing collateral's characteristics. This function cannot change a collaterals address, if this is needed then a new type of collateral must be added and 
-the old collateral deactivated. This function is only callable by the Admin
+the old collateral deactivated. We make several obvious sanity checks on inputs, most importantly checking the assetType already has a related vault assigned. We also check the liquidation ratio is sufficient to prevent errors cropping up. This function is only callable by the Admin
 
 - changeCollateralType
-This is the second call in a 2 stage process of changing an existing collateral's characteristics. Note the queued data is not deleted once used however this is only callable by an Admin and only one change can be queued at a time meaning it would just repeat the same change if ran twice or more. This call can fail if the `virtualPrice` is very out-of-date as the old interest rate is used to update the `virtualPrice` first then the new values are set. 
-//IMPORTANT THIS DOES NOT WIPE QUEUED VALUES ONCE SET, ADVISE TO DO SO.
+This is the second call in a 2 stage process of changing an existing collateral's characteristics. Note the queued data is not deleted once used however this is only callable by an Admin and only one change can be queued at a time meaning it would just repeat the same change if ran twice or more. This call can fail if the `virtualPrice` is very out-of-date as the old interest rate is used to update the `virtualPrice` first then the new values are set, therefore if too long a time period has occured before the update it will DOS due to the block gas limit, to sidestep this  you call `updateVirtualPriceSlowly()` first. This function is only callable by the Admin
+
 
 - _changeCollateralParameters
 An internal function used by `changeCollateralType` to update the collateral's characteristics.
@@ -39,8 +39,8 @@ and so should prevent pausing of the wrong collateral
 - unpauseCollateralType
 This function enables an Admin to unpause a previously paused collateral. In doing so the `collateralPaused` mapping of it's address is set to `False` and it's collateralValid mapping is set to `True`. We require the currencyKey to be provided alongside the collateralAddress as this is easier to spot errors in and so should prevent pausing of the wrong collateral.
  
-- setVaultAddress
-//IMPORTANT THIS MUST BE EXPANDED TO ALLOW MULTIPLE VAULTS
+- addVaultAddress
+We assign a new vault to an assetType by calling this function, the new Vault is also assigned the Vault role which allows it to mint new moUSD. This function is only callable by the Admin
 
 - _updateVirtualPriceAndTime
 This internal function is used whenever a `virtualPrice` and `lastUpdateTime` of a collateral is being updated. It contains sanity checks that the updated values are strictly larger than the existing values. The `virtualPrice` and `lastUpdateTime` should never decrease.

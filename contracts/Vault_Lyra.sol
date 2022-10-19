@@ -41,10 +41,8 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    //uint256 private constant LOWER_LIQUIDATION_BAND = 9 ether /10; //90% used to determine if smaller liquidations are viable
     uint256 private constant LOAN_SCALE = 1 ether; //base for division/decimal maths
     uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
-    uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
 
     //Enums
     enum AssetType {Synthetix_Synth, Lyra_LP} // collateral type identifiers to ensure the right valuation method is employed
@@ -339,7 +337,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         ) external whenNotPaused collateralExists(_collateralAddress) 
         {
         IERC20 collateral = IERC20(_collateralAddress);
-        require(_USDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); //CHANGED HERE MIN LOAN OF 100
+        
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
         //make sure virtual price is related to current time before fetching collateral details
         //slither-disable-next-line reentrancy-vulnerabilities-1

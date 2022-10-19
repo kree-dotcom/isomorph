@@ -341,7 +341,6 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         ) external whenNotPaused collateralExists(_collateralAddress) 
         {
         IERC20 collateral = IERC20(_collateralAddress);
-        require(_USDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); 
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
         //make sure virtual price is related to current time before fetching collateral details
         //slither-disable-next-line reentrancy-vulnerabilities-1
@@ -362,6 +361,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         //make sure the total moUSD borrowed doesn't exceed the opening borrow margin ratio
         uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender]);
         uint256 totalUSDborrowed = _USDborrowed +  (moUSDLoaned[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
+        require(totalUSDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); 
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
 
@@ -503,7 +503,6 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         bytes32 _currencyKey, 
         uint256 _virtualPrice
         ) internal {
-        //IERC20 collateral = IERC20(_collateralAddress);
         //record paying off loan principle before interest
             uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
             //slither-disable-next-line uninitialized-local-variables

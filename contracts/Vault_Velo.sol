@@ -1,4 +1,7 @@
-//SPDX-License-Identifier: UNLICENSED 
+// SPDX-License-Identifier: MIT
+// Vault_Velo.sol for isomorph.loans
+// Bug bounties available
+
 pragma solidity =0.8.9; 
 pragma abicoder v2;
 
@@ -296,7 +299,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function _decreaseLoanOrCollateral(
         address _collateralAddress,
         address _loanHolder, 
-        CollateralNFTs memory _loanNFTs, 
+        CollateralNFTs calldata _loanNFTs, 
         uint256 _partialPercentage, 
         uint256 _USDReturned,
         uint256 _interestPaid
@@ -360,7 +363,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         bool _addingCollateral
         ) external whenNotPaused  
         {   
-            _validMarketConditions(_collateralAddress, msg.sender);
+            _collateralExists(_collateralAddress);
             //slither-disable-next-line uninitialized-local-variables
             IDepositReceipt depositReceipt;
             //slither-disable-next-line uninitialized-local-variables
@@ -496,12 +499,12 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     
     function closeLoan(
         address _collateralAddress,
-        CollateralNFTs memory _loanNFTs,
+        CollateralNFTs calldata _loanNFTs,
         uint256 _USDToVault,
         uint256 _partialPercentage
         ) external whenNotPaused 
         {
-        _validMarketConditions(_collateralAddress, msg.sender);
+        _collateralExists(_collateralAddress);
         //check input NFT slots and ids are correct
         for(uint256 i = 0; i < NFT_LIMIT; i++){
                 require(_loanNFTs.slots[i] == 
@@ -562,7 +565,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     
     function _calculateProposedReturnedCapital(
         address _collateralAddress, 
-        CollateralNFTs memory _loanNFTs, 
+        CollateralNFTs calldata _loanNFTs, 
         uint256 _partialPercentage
         ) internal view returns(uint256){
         //slither-disable-next-line uninitialized-local-variables
@@ -592,7 +595,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function _returnAndSplitNFTs(
         address _collateralAddress, 
         address _loanHolder, 
-        CollateralNFTs memory _loanNFTs, 
+        CollateralNFTs calldata _loanNFTs, 
         uint256 _partialPercentage
         ) internal{
 
@@ -619,7 +622,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         address _loanHolder,
         address _collateralAddress,
         uint256 _collateralLiquidated,
-        CollateralNFTs memory _loanNFTs,
+        CollateralNFTs calldata _loanNFTs,
         uint256 _partialPercentage,
         uint256 _moUSDReturned,
         bytes32 _currencyKey, 
@@ -710,7 +713,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress,
-            CollateralNFTs memory _loanNFTs,
+            CollateralNFTs calldata _loanNFTs,
             uint256 _partialPercentage
         ) external whenNotPaused  
         {   

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// Vault_Synths.sol for isomorph.loans
+// Bug bounties available
+
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
