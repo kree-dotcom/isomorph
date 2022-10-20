@@ -197,19 +197,6 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         return( depositReceipt.priceLiquidity(pooledTokens));
     }
 
-    function _totalCollateralValue(address _collateralAddress, address _owner) internal view returns(uint256){
-        NFTids memory userNFTs = loanNFTids[_collateralAddress][_owner];
-        IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
-        //slither-disable-next-line uninitialized-local-variables
-        uint256 totalPooledTokens;
-        for(uint256 i =0; i < NFT_LIMIT; i++){
-            //check if each slot contains an NFT
-            if (userNFTs.ids[i] != 0){
-                totalPooledTokens += depositReceipt.pooledTokens(userNFTs.ids[i]);
-            }
-        }
-        return(depositReceipt.priceLiquidity(totalPooledTokens));
-    }
 
     /// @param _collateralAddress the address of the collateral token you are fetching
     /// @notice returns all collateral struct fields seperately so that functions requiring 
@@ -322,16 +309,19 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
     function _checkNFTOwnership(address _collateralAddress, uint256 _NFTId, address _owner) internal view returns(uint256){
         require(_NFTId != 0 , "Zero NFTId not allowed");
+
         NFTids memory userNFTs = loanNFTids[_collateralAddress][_owner];
         for(uint256 i =0; i < NFT_LIMIT; i++){
             //check if each slot matches our specified NFT
             if (userNFTs.ids[i] == _NFTId){
                 //if so return the slot so we know
+                
                 return (i);
             }
+        }
             //only slots 0-7 are valid, so if 999 is returned then we know the user has no loan against this NFT id.
             return (NOT_OWNED);
-        }
+        
     }
 
 
@@ -339,6 +329,25 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         Public functions 
     */
 
+    /**
+      * @notice Only Vaults can mint moUSD.
+      * @dev Mints 'USDborrowed' amount of moUSD to vault and transfers to msg.sender and emits transfer event.
+      * @param _collateralAddress address of deposit receipt being used as loan collateral.
+      * @param _owner the address of the loan holder
+     **/
+    function totalCollateralValue(address _collateralAddress, address _owner) public view returns(uint256){
+        NFTids memory userNFTs = loanNFTids[_collateralAddress][_owner];
+        IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
+        //slither-disable-next-line uninitialized-local-variables
+        uint256 totalPooledTokens;
+        for(uint256 i =0; i < NFT_LIMIT; i++){
+            //check if each slot contains an NFT
+            if (userNFTs.ids[i] != 0){
+                totalPooledTokens += depositReceipt.pooledTokens(userNFTs.ids[i]);
+            }
+        }
+        return(depositReceipt.priceLiquidity(totalPooledTokens));
+    }
 
     function getLoanNFTids(address _user, address _collateralAddress, uint256 _index) external view returns(uint256){
         return(loanNFTids[_collateralAddress][_user].ids[_index]);
@@ -393,7 +402,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         { //scoping to avoid stack too deep
             uint256 existingLoan = moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice /LOAN_SCALE;
             uint256 borrowMargin = ((_USDborrowed+ existingLoan) * minOpeningMargin) /LOAN_SCALE;
-            uint256 existingCollateral = _totalCollateralValue(_collateralAddress, msg.sender); 
+            uint256 existingCollateral = totalCollateralValue(_collateralAddress, msg.sender); 
             require( addedValue + existingCollateral >= borrowMargin, "Minimum margin not met!");
         }
         if(_addingCollateral){
@@ -438,7 +447,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         _collateralExists(_collateralAddress);
         //zero indexes cause problems with mappings and ownership, so refuse them
         require(_NFTId != 0, "No zero index NFTs allowed");
-        uint256 existingCollateral = _totalCollateralValue(_collateralAddress, msg.sender);
+        uint256 existingCollateral = totalCollateralValue(_collateralAddress, msg.sender);
         require( existingCollateral > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
         //checks msg.sender owns specified NFT id
         IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
@@ -527,7 +536,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         uint256 outstandingMoUSD = moUSDdebt - _USDToVault;
         uint256 colInUSD = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
         if(outstandingMoUSD >= TENTH_OF_CENT){ //ignore debts less than $0.001
-            uint256 collateralLeft = _totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
+            uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
             uint256 borrowMargin = (outstandingMoUSD * minOpeningMargin) / LOAN_SCALE;
             require(collateralLeft > borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
@@ -734,7 +743,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             ) = _getCollateral(_collateralAddress);
             
             uint256 moUSDBorrowed = (moUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
-            uint256 totalUserCollateral = _totalCollateralValue(_collateralAddress, _loanHolder);
+            uint256 totalUserCollateral = totalCollateralValue(_collateralAddress, _loanHolder);
             uint256 proposedLiquidationAmount;
             { //scope block for liquidationAmount due to stack too deep
                 uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, 1 ether, moUSDBorrowed, liquidatableMargin);

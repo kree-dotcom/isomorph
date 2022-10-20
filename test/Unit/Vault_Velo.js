@@ -722,6 +722,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       const loanTaken = collateralUsed.div(2)
       await depositReceipt.connect(alice).approve(vault.address, NFTId)
       await expect(vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, loanTaken, NFTCode,collateralUsed );
+      
       //then we make another loan with a different user 
       // for the purposes of nullifying the impact
       // of the openLoanFee and time elapsed interest due.
@@ -739,7 +740,7 @@ describe("Unit tests: Vault_Velo contract", function () {
         
     });
 
-    it("Should return user moUSD if valid conditions are met and emit ClosedLoan event", async function () {
+    it("Should return user collateral NFT if valid conditions are met and emit ClosedLoan event", async function () {
       const NFTId = 1;
       let timeJump = timeSkipRequired(1.01);
       await cycleVirtualPrice(timeJump, depositReceipt);
@@ -760,6 +761,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       
       await moUSD.connect(alice).approve(vault.address, valueClosing);
       //IDs passed in slots relating to NOT_OWNED are disregarded
+      console.log("Loan collats zero before closeLoan ", await vault.getLoanNFTids(alice.address,depositReceipt.address,0))
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
       //zero for partial percentage 4th arg as we aren't using it here
       await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
@@ -779,6 +781,80 @@ describe("Unit tests: Vault_Velo contract", function () {
       const afterNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(afterNFTowner).to.equal(alice.address);
     });
+
+    it("Should return user NFT for a successful closeLoan call regardless of NFT ID", async function () {
+      
+      for(let i =0; i < 8; i++){
+        await depositReceipt.connect(alice).UNSAFEMint(amount)
+      }
+      const NFTId = 10;
+      let newPooledTokens = await depositReceipt.pooledTokens(NFTId)
+      const collateralAdding = await depositReceipt.priceLiquidity(newPooledTokens)
+
+
+      await depositReceipt.connect(alice).approve(vault.address, NFTId)
+      await expect(vault.connect(alice).openLoan(depositReceipt.address, NFTId, 0, addingCollateral)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, 0, NFTCode, collateralAdding );
+
+      let realDebt = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address);
+      let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      
+      let valueClosing = realDebt.mul(virtualPrice).div(e18);
+
+      const beforeNFTowner = await depositReceipt.ownerOf(NFTId);
+      expect(beforeNFTowner).to.equal(vault.address);
+
+      const beforeMoUSDBalance = await moUSD.balanceOf(alice.address);
+      const pooledTokens = await depositReceipt.pooledTokens(NFTId)
+      const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
+      const totalLoanBefore = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
+      
+      await moUSD.connect(alice).approve(vault.address, valueClosing);
+      //IDs passed in slots relating to NOT_OWNED are disregarded
+      let NFT_slot = 1
+      const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[NFT_slot,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
+      //zero for partial percentage 4th arg as we aren't using it here
+
+      //check removing a collateral updates the registered collateral loans Ids mapping right.
+      loan_ids = []
+
+      for(i =0; i < 8; i++){
+        loan_ids.push(await vault.getLoanNFTids(alice.address,depositReceipt.address,i))
+      }
+      
+      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
+      
+      after_loan_ids = [] 
+      for(i =0; i < 8; i++){
+        after_loan_ids.push(await vault.getLoanNFTids(alice.address,depositReceipt.address,i))
+      }
+
+      //a fully paid loan should repay all principle
+      const principle = await vault.moUSDLoaned(depositReceipt.address, alice.address)
+      expect(principle).to.equal(0)
+
+      //a fully repaid loan should repay all interest also, minus dust
+      const totalLoan = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
+      let error = totalLoanBefore.div(100000) //0.001%
+      expect(totalLoan).to.be.closeTo(zero, error)
+      
+      const AfterMoUSDBalance = await moUSD.balanceOf(alice.address);
+      expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
+
+      const afterNFTowner = await depositReceipt.ownerOf(NFTId);
+      expect(afterNFTowner).to.equal(alice.address);
+
+      //Final check, check only the NFT slot relating to the NFT we removed has been reset.
+      for(i =0; i < 8; i++){
+        if(i != NFT_slot){
+          expect(after_loan_ids[i]).to.equal(loan_ids[i])
+        }
+        else{
+          expect(after_loan_ids[i]).to.equal(0)
+        }
+        
+      }
+    });
+    
     
     it("Should allow reducing margin ratio if in excess by drawing out collateral", async function () {
       let realDebt = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address);
