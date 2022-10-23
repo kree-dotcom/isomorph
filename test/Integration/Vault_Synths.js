@@ -849,7 +849,7 @@ describe("Integration tests: Vault Synths contract", function () {
       //check the fees accumulated in the treasury
       const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
-      let expectedFees = valueClosing.sub(loanTaken2)
+      let expectedFees = valueClosing.sub(loanAmount2)
       expect(TreasuryMoUSDDifference).to.equal(expectedFees)
 
       const AfterColBalance = await sUSD.balanceOf(addr1.address);
