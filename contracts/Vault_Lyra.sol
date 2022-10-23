@@ -8,7 +8,7 @@ pragma abicoder v2;
 // Interfaces
 import "./interfaces/IMoUSDToken.sol";
 import "./interfaces/ITreasury.sol";
-import "./interfaces/IVault.sol";
+//import "./interfaces/IVault.sol";
 import "./interfaces/ICollateralBook.sol";
 import "./helper/interfaces/ISynthetix.sol";
 import "./helper/interfaces/IExchangeRates.sol";
@@ -58,9 +58,9 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     uint256 public loanOpenFee = 1 ether /100; //1 percent opening fee.
 
     
-    ITreasury treasury;
-    IMoUSDToken moUSD;
-    ICollateralBook collateralBook;    
+    ITreasury public treasury;
+    IMoUSDToken public moUSD;
+    ICollateralBook public collateralBook;    
    
 
     event OpenOrIncreaseLoan(address indexed user, uint256 loanTaken, bytes32 indexed collateralToken, uint256 collateralAmount); 

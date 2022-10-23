@@ -27,16 +27,18 @@ As borrowers will wish to use their MoUSD on other DeFi protocols it will vital 
 
 ## Tests:
 
-Begin by cloning the repo,
-Then run "yarn install" in the main directory to install all required packages
-connect your API endpoints and privatekey using the .env file. See sample_env for details.
+- Begin by cloning the repo
+- Then run "yarn install" in the main directory to install all required packages
+- Connect your API endpoints and privatekey using the .env file. See sample_env for details.
+
 If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
-Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, 
-if this happens run again.
+
+- Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again.
 
 # Slither results
 Running slither . --filter-paths "contracts/tests|node_modules|contracts/Migrations|contracts/helper|contracts/interfaces|contracts/ConfirmedOwnerWithProposal"
 produces 218 results. The above paths were filtered due to either not being written by us or being irrelevant. 
+
 
 
 ## Definitions:
