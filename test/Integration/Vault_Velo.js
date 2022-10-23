@@ -25,7 +25,7 @@ async function impersonateForToken(provider, receiver, ERC20, donerAddress, amou
   
 }
 
-describe.only("Integration tests: Vault_Velo contract", function () {
+describe("Integration tests: Vault_Velo contract", function () {
   
 
   let Token;
@@ -451,6 +451,27 @@ describe.only("Integration tests: Vault_Velo contract", function () {
      
     });
     
+    it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await depositReceipt.connect(alice).approve(vault.address, NFTId);
+
+      let tx = await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, true)
+      let virtualPrice_1 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      useless_NFT_id = 99
+      let tx_2 = await vault.connect(alice).openLoan(depositReceipt.address, useless_NFT_id, loanTaken, false)
+      let virtualPrice_2 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+
+      //check timestamps are within 3 minutes of each other
+      const block_1 = await ethers.provider.getBlock(tx.blockNumber);
+      const block_2 = await ethers.provider.getBlock(tx_2.blockNumber);
+      const THREE_MINS = 3 *60
+      expect(block_1.timestamp).to.be.closeTo(block_2.timestamp, THREE_MINS)
+
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_1).to.equal(virtualPrice_2)
+    });
+
     
     it("Should fail if daily max Loan amount exceeded", async function () {
       const loanTaken = 500000 
@@ -735,12 +756,13 @@ describe.only("Integration tests: Vault_Velo contract", function () {
   describe("CloseLoans", function () {
     const fullValue = e18;
     const NOT_OWNED = 999;
+    let loanTaken
 
     beforeEach(async function () {
       const NFTId = 1;
       const pooledTokens = await depositReceipt.pooledTokens(NFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
-      const loanTaken = collateralUsed.div(2)
+      loanTaken = collateralUsed.div(2)
       await depositReceipt.connect(alice).approve(vault.address, NFTId)
       await expect(vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, true)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, loanTaken, NFTCode,collateralUsed );
       //then we make another loan with a different user 
@@ -770,6 +792,7 @@ describe.only("Integration tests: Vault_Velo contract", function () {
       let valueClosing = realDebt.mul(virtualPrice).div(e18);
       
       const beforeMoUSDBalance = await moUSD.balanceOf(alice.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
 
       const beforeNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(beforeNFTowner).to.equal(vault.address);
@@ -777,6 +800,7 @@ describe.only("Integration tests: Vault_Velo contract", function () {
       const pooledTokens = await depositReceipt.pooledTokens(NFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const totalLoanBefore = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
+
 
       await moUSD.connect(alice).approve(vault.address, valueClosing);
       //IDs passed in slots relating to NOT_OWNED are disregarded
@@ -795,6 +819,12 @@ describe.only("Integration tests: Vault_Velo contract", function () {
 
       const AfterMoUSDBalance = await moUSD.balanceOf(alice.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
+
+      //check the fees accumulated in the treasury
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
+      let expectedFees = valueClosing.sub(loanTaken)
+      expect(TreasuryMoUSDDifference).to.equal(expectedFees)
 
       const afterNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(afterNFTowner).to.equal(alice.address);
@@ -947,6 +977,7 @@ describe.only("Integration tests: Vault_Velo contract", function () {
       expect(beforeNFTowner3).to.equal(vault.address);
       
       const beforeMoUSDBalance = await moUSD.balanceOf(alice.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const pooledTokens = await depositReceipt.pooledTokens(requestedNFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const principleBefore = await vault.moUSDLoaned(depositReceipt.address, alice.address)
@@ -967,6 +998,10 @@ describe.only("Integration tests: Vault_Velo contract", function () {
       const totalLoan = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
       const expectedTotalLoan = totalLoanBefore.sub(valueClosing.mul(base).div(virtualPriceAfter))
       expect(totalLoan).to.equal(expectedTotalLoan)
+
+      //as we have paid no interest there should be no fee paid to the treasury yet
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      expect(TreasuryMoUSDBalance).to.equal(beforeTreasuryMoUSDBalance)
 
       const finalMoUSDBalance = await moUSD.balanceOf(alice.address);
       expect(finalMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));

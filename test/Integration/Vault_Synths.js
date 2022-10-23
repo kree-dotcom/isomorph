@@ -82,7 +82,7 @@ async function cycleVirtualPrice(steps, collateral) {
 }
 
 
-describe.only("Integration tests: Vault Synths contract", function () {
+describe("Integration tests: Vault Synths contract", function () {
   
 
   let owner; //0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
@@ -439,6 +439,40 @@ describe.only("Integration tests: Vault Synths contract", function () {
       expect(AfterTreasuryBalance).to.equal(moUSDafterTreasury);
       
     });
+
+    it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
+      const minimumLoan = ethers.utils.parseEther('100');
+      await sUSD.connect(addr1).approve(vault.address, collateralUsed);
+
+      let tx = await vault.connect(addr1).openLoan(sUSD.address, collateralUsed, minimumLoan)
+      let virtualPrice_1 = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
+      
+      let tx_2 = await vault.connect(addr1).openLoan(sUSD.address, 0, minimumLoan)
+      let virtualPrice_2 = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
+
+      //check timestamps are within 3 minutes of each other
+      const block_1 = await ethers.provider.getBlock(tx.blockNumber);
+      const block_2 = await ethers.provider.getBlock(tx_2.blockNumber);
+      const THREE_MINS = 3 *60
+      expect(block_1.timestamp).to.be.closeTo(block_2.timestamp, THREE_MINS)
+
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_1).to.equal(virtualPrice_2)
+    });
+
+    it("Should only not update another collateral's virtualPrice if called", async function () {
+      const minimumLoan = ethers.utils.parseEther('100'); 
+      await sUSD.connect(addr1).approve(vault.address, collateralUsed);
+
+      let virtualPrice_other_asset = await collateralBook.viewVirtualPriceforAsset(sETH.address);
+
+      await vault.connect(addr1).openLoan(sUSD.address, collateralUsed, minimumLoan)
+      
+      let virtualPrice_other_asset_after = await collateralBook.viewVirtualPriceforAsset(sETH.address);
+      
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_other_asset).to.equal(virtualPrice_other_asset_after)
+    });
     
     it("Should fail if daily max Loan amount exceeded", async function () {
       await vault.connect(owner).setDailyMax(1000);
@@ -509,7 +543,7 @@ describe.only("Integration tests: Vault Synths contract", function () {
 
     });
     
-    it.only("Should fail if loan requested does not meet minimum size", async function () {
+    it("Should fail if loan requested does not meet minimum size", async function () {
       let tooSmallAmount = ethers.utils.parseEther('1');
       await expect(
         vault.connect(addr1).openLoan(sUSDaddr, collateralUsed, tooSmallAmount)
@@ -764,8 +798,8 @@ describe.only("Integration tests: Vault Synths contract", function () {
   });
   describe("CloseLoans", function () {
     //the 2 after these vars is because it was grabbing the wrong value from somewhere else, can't find where
-    collateralAmount2 = ethers.utils.parseEther("1000");
-    loanAmount2 = collateralAmount.div(2)
+    const collateralAmount2 = ethers.utils.parseEther("1000");
+    const loanAmount2 = collateralAmount.div(2)
     beforeEach(async function () {
       
       await sUSD.connect(addr1).approve(vault.address, collateralAmount2);
@@ -787,9 +821,15 @@ describe.only("Integration tests: Vault Synths contract", function () {
     
       let realDebt = await vault.moUSDLoanAndInterest(sUSD.address, addr1.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
+      
+      //quantity of moUSD to repay
       const valueClosing = realDebt.mul(virtualPrice).div(e18);
+
       const beforeMoUSDBalance = await moUSD.balanceOf(addr1.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const beforeColBalance = await sUSD.balanceOf(addr1.address);
+
+      //request full collateral amount back
       const requestedCollateral = collateralAmount;
 
       await moUSD.connect(addr1).approve(vault.address, valueClosing);
@@ -806,11 +846,17 @@ describe.only("Integration tests: Vault Synths contract", function () {
       const AfterMoUSDBalance = await moUSD.balanceOf(addr1.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
 
+      //check the fees accumulated in the treasury
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
+      let expectedFees = valueClosing.sub(loanTaken2)
+      expect(TreasuryMoUSDDifference).to.equal(expectedFees)
+
       const AfterColBalance = await sUSD.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
     });
 
-    it("Should return user moUSD if valid conditions are met and emit ClosedLoan event after interest has accrued", async function () {
+    it("Should return user collateral if valid conditions are met and emit ClosedLoan event after interest has accrued", async function () {
       //time skip to cycle virtualPrice and accrue interest on loan
       let timeJump = timeSkipRequired(1.011, threeMinInterest);
       await cycleVirtualPrice(timeJump, sUSD);
@@ -940,6 +986,7 @@ describe.only("Integration tests: Vault Synths contract", function () {
     it("Should allow partial closure of loan if valid conditions are met", async function () {
 
       const beforeMoUSDBalance = await moUSD.balanceOf(addr1.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const beforeColBalance = await sUSD.balanceOf(addr1.address);
       const valueClosing = ethers.utils.parseEther("250");
       const requestedCollateral = ethers.utils.parseEther("500");
@@ -958,6 +1005,10 @@ describe.only("Integration tests: Vault Synths contract", function () {
       const totalLoan = await vault.moUSDLoanAndInterest(sUSD.address, addr1.address)
       const expectedTotalLoan = totalLoanBefore.sub(valueClosing.mul(base).div(virtualPrice))
       expect(totalLoan).to.equal(expectedTotalLoan)
+
+      //as we have paid no interest there should be no fee paid to the treasury yet
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      expect(TreasuryMoUSDBalance).to.equal(beforeTreasuryMoUSDBalance)
 
       const AfterMoUSDBalance = await moUSD.balanceOf(addr1.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing))

@@ -41,7 +41,7 @@ describe("Unit tests: Vault_Velo contract", function () {
   
   const testCode = ethers.utils.formatBytes32String("test");
   const sUSDCode = ethers.utils.formatBytes32String("sUSD");
-  const NFTCode = ethers.utils.formatBytes32String("VELO1");
+  const NFTCode = ethers.utils.formatBytes32String("sAMM-USDC-sUSD");
   const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
 
   const e18 = ethers.utils.parseEther('1');
@@ -131,7 +131,7 @@ describe("Unit tests: Vault_Velo contract", function () {
         const NFTMinMargin = ethers.utils.parseEther("2.0");
         const NFTLiqMargin = ethers.utils.parseEther("1.1");
         const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
-        const SYNTH = 1
+        
         await collateralBook.addCollateralType(depositReceipt.address, NFTCode, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
         
 
@@ -435,6 +435,62 @@ describe("Unit tests: Vault_Velo contract", function () {
      
     })
 
+    it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await depositReceipt.connect(alice).approve(vault.address, NFTId);
+
+      let tx = await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, true)
+      let virtualPrice_1 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      useless_NFT_id = 99
+      let tx_2 = await vault.connect(alice).openLoan(depositReceipt.address, useless_NFT_id, loanTaken, false)
+      let virtualPrice_2 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+
+      //check timestamps are within 3 minutes of each other
+      const block_1 = await ethers.provider.getBlock(tx.blockNumber);
+      const block_2 = await ethers.provider.getBlock(tx_2.blockNumber);
+      const THREE_MINS = 3 *60
+      expect(block_1.timestamp).to.be.closeTo(block_2.timestamp, THREE_MINS)
+
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_1).to.equal(virtualPrice_2)
+    });
+
+    it("Should only not update another collateral's virtualPrice if called", async function () {
+      //second collateral to use
+      depositReceipt2 = await DepositReceipt.deploy(
+        "Deposit_Receipt_Two",
+        "DR2",
+        router.address,
+        alice.address,
+        bob.address,
+        true,
+        priceOracle.address
+        )
+      //mint depositReceipt Tokens to test with    
+      const amount= ethers.utils.parseEther('1000')
+      await depositReceipt2.connect(alice).UNSAFEMint(amount)
+      
+      let NFTCode_2 = ethers.utils.formatBytes32String("vAMM-USDC-OP");
+      const NFTMinMargin = ethers.utils.parseEther("2.0");
+      const NFTLiqMargin = ethers.utils.parseEther("1.1");
+      const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
+      await collateralBook.addCollateralType(depositReceipt2.address, NFTCode_2, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
+
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await depositReceipt2.connect(alice).approve(vault.address, NFTId);
+
+      let virtualPrice_other_asset = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+
+      await vault.connect(alice).openLoan(depositReceipt2.address, NFTId, loanTaken, true)
+      
+      let virtualPrice_other_asset_after = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_other_asset).to.equal(virtualPrice_other_asset_after)
+    });
+
     it("Should fail if addingCollateral is false and opening new loan", async function () {
       const loanTaken = 500000 
       const NFTId = 1;  
@@ -714,12 +770,13 @@ describe("Unit tests: Vault_Velo contract", function () {
   describe("CloseLoans", function () {
     const fullValue = e18;
     const NOT_OWNED = 999;
+    let loanTaken
 
     beforeEach(async function () {
       const NFTId = 1;
       const pooledTokens = await depositReceipt.pooledTokens(NFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
-      const loanTaken = collateralUsed.div(2)
+      loanTaken = collateralUsed.div(2)
       await depositReceipt.connect(alice).approve(vault.address, NFTId)
       await expect(vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, loanTaken, NFTCode,collateralUsed );
       
@@ -755,13 +812,13 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect(beforeNFTowner).to.equal(vault.address);
 
       const beforeMoUSDBalance = await moUSD.balanceOf(alice.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const pooledTokens = await depositReceipt.pooledTokens(NFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const totalLoanBefore = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
       
       await moUSD.connect(alice).approve(vault.address, valueClosing);
       //IDs passed in slots relating to NOT_OWNED are disregarded
-      console.log("Loan collats zero before closeLoan ", await vault.getLoanNFTids(alice.address,depositReceipt.address,0))
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
       //zero for partial percentage 4th arg as we aren't using it here
       await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
@@ -775,11 +832,17 @@ describe("Unit tests: Vault_Velo contract", function () {
       let error = totalLoanBefore.div(100000) //0.001%
       expect(totalLoan).to.be.closeTo(zero, error)
       
-      const AfterMoUSDBalance = await moUSD.balanceOf(alice.address);
-      expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
+      const AfterMoUSDBalance = await moUSD.balanceOf(alice.address)
+      expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing))
 
-      const afterNFTowner = await depositReceipt.ownerOf(NFTId);
-      expect(afterNFTowner).to.equal(alice.address);
+      //check the fees accumulated in the treasury
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
+      let expectedFees = valueClosing.sub(loanTaken)
+      expect(TreasuryMoUSDDifference).to.equal(expectedFees)
+
+      const afterNFTowner = await depositReceipt.ownerOf(NFTId)
+      expect(afterNFTowner).to.equal(alice.address)
     });
 
     it("Should return user NFT for a successful closeLoan call regardless of NFT ID", async function () {
@@ -933,6 +996,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       
       //store data to compare to after closeLoan
       const beforeMoUSDBalance = await moUSD.balanceOf(alice.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const pooledTokens = await depositReceipt.pooledTokens(requestedNFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const principleBefore = await vault.moUSDLoaned(depositReceipt.address, alice.address)
@@ -954,6 +1018,10 @@ describe("Unit tests: Vault_Velo contract", function () {
       const totalLoan = await vault.moUSDLoanAndInterest(depositReceipt.address, alice.address)
       const expectedTotalLoan = totalLoanBefore.sub(valueClosing.mul(base).div(virtualPriceAfter))
       expect(totalLoan).to.equal(expectedTotalLoan)
+
+      //as we have paid no interest there should be no fee paid to the treasury yet
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      expect(TreasuryMoUSDBalance).to.equal(beforeTreasuryMoUSDBalance)
 
 
       const finalMoUSDBalance = await moUSD.balanceOf(alice.address);

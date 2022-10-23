@@ -197,8 +197,10 @@ describe("Integration tests: Vault Lyra contract", function () {
       
   describe("Construction", function (){
     it("Should deploy the right constructor addresses", async function (){
-      //const EXCHANGE_RATES = addresses.optimism.Exchange_Rates;
-      //expect( await vault.EXCHANGE_RATES()).to.equal(EXCHANGE_RATES);
+      
+      expect( await vault.treasury()).to.equal(treasury.address);
+      expect( await vault.moUSD()).to.equal(moUSD.address);
+      expect( await vault.collateralBook()).to.equal(collateralBook.address);
      
     });
   });
@@ -546,6 +548,46 @@ describe("Integration tests: Vault Lyra contract", function () {
       expect(AfterTreasuryBalance).to.equal(beforeTreasuryBalance.add(loanIncrease.mul(loanOpenfee).div(base))); 
       
     });
+
+    it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
+      const minimumLoan = ethers.utils.parseEther('100');
+      await lyraLPToken.connect(addr1).approve(vault.address, collateralUsed);
+
+      let tx = await vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, minimumLoan)
+      let virtualPrice_1 = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
+      
+      let tx_2 = await vault.connect(addr1).openLoan(lyraLPToken.address, 0, minimumLoan)
+      let virtualPrice_2 = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
+
+      //check timestamps are within 3 minutes of each other
+      const block_1 = await ethers.provider.getBlock(tx.blockNumber);
+      const block_2 = await ethers.provider.getBlock(tx_2.blockNumber);
+      const THREE_MINS = 3 *60
+      expect(block_1.timestamp).to.be.closeTo(block_2.timestamp, THREE_MINS)
+
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_1).to.equal(virtualPrice_2)
+    });
+
+    it("Should only not update another collateral's virtualPrice if called", async function () {
+      const MinMargin = ethers.utils.parseEther("1.8");
+      const LiqMargin = ethers.utils.parseEther("1.053");
+      const Interest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
+      await collateralBook.addCollateralType(FakeAddr, lyraCode, MinMargin, LiqMargin, Interest, LYRA, lyraLiqPool.address);
+
+      const minimumLoan = ethers.utils.parseEther('100'); 
+      await lyraLPToken.connect(addr1).approve(vault.address, collateralUsed);
+
+      let virtualPrice_other_asset = await collateralBook.viewVirtualPriceforAsset(FakeAddr);
+
+      await vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, minimumLoan)
+      
+      let virtualPrice_other_asset_after = await collateralBook.viewVirtualPriceforAsset(FakeAddr);
+      
+      //if we are within 3 minutes both virtual prices should be the same
+      expect(virtualPrice_other_asset).to.equal(virtualPrice_other_asset_after)
+    });
+
     //SLOW TEST
     it("Should fail to increase debt if interest accrued is too high", async function () {
       //because the Greeks can't update after very large time periods we use a hack here to set the virtualPrice
@@ -792,7 +834,9 @@ describe("Integration tests: Vault Lyra contract", function () {
       let realDebt = await vault.moUSDLoanAndInterest(lyraLPToken.address, addr1.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
       const valueClosing = realDebt.mul(virtualPrice).div(e18);
+
       const beforeMoUSDBalance = await moUSD.balanceOf(addr1.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const beforeColBalance = await lyraLPToken.balanceOf(addr1.address);
       const requestedCollateral = collateralAmount;
       
@@ -810,6 +854,12 @@ describe("Integration tests: Vault Lyra contract", function () {
 
       const AfterMoUSDBalance = await moUSD.balanceOf(addr1.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
+
+      //check the fees accumulated in the treasury
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
+      let expectedFees = valueClosing.sub(loanAmount)
+      expect(TreasuryMoUSDDifference).to.be.closeTo(expectedFees, error) 
       
       const AfterColBalance = await lyraLPToken.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
@@ -822,7 +872,9 @@ describe("Integration tests: Vault Lyra contract", function () {
       let realDebt = await vault.moUSDLoanAndInterest(lyraLPToken.address, addr1.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
       const valueClosing = realDebt.mul(virtualPrice).div(e18)
+
       const beforeMoUSDBalance = await moUSD.balanceOf(addr1.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const beforeColBalance = await lyraLPToken.balanceOf(addr1.address);
       const requestedCollateral = collateralAmount;
 
@@ -845,6 +897,12 @@ describe("Integration tests: Vault Lyra contract", function () {
       //expect all the repaid loan to be removed from the user
       const AfterMoUSDBalance = await moUSD.balanceOf(addr1.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing));
+
+      //check the fees accumulated in the treasury
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      let TreasuryMoUSDDifference = TreasuryMoUSDBalance.sub(beforeTreasuryMoUSDBalance)
+      let expectedFees = valueClosing.sub(loanAmount)
+      expect(TreasuryMoUSDDifference).to.equal(expectedFees)
       
       const AfterColBalance = await lyraLPToken.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
@@ -933,6 +991,7 @@ describe("Integration tests: Vault Lyra contract", function () {
 
     it("Should allow partial closure of loan if valid conditions are met", async function () {
       const beforeMoUSDBalance = await moUSD.balanceOf(addr1.address);
+      const beforeTreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
       const beforeColBalance = await lyraLPToken.balanceOf(addr1.address);
 
       const valueClosing = ethers.utils.parseEther("250");
@@ -943,6 +1002,10 @@ describe("Integration tests: Vault Lyra contract", function () {
       
       const AfterMoUSDBalance = await moUSD.balanceOf(addr1.address);
       expect(AfterMoUSDBalance).to.equal(beforeMoUSDBalance.sub(valueClosing))
+
+      //as we have paid no interest there should be no fee paid to the treasury yet
+      const TreasuryMoUSDBalance = await moUSD.balanceOf(treasury.address)
+      expect(TreasuryMoUSDBalance).to.equal(beforeTreasuryMoUSDBalance)
 
       const AfterColBalance = await lyraLPToken.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
