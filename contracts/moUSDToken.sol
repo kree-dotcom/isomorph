@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: MIT
+// Vault_Synths.sol for isomorph.loans
+// Bug bounties available
+
 pragma solidity =0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./RoleControl.sol";
 
-uint256 constant MOUSD_TIME_DELAY = 3; //days;
+uint256 constant MOUSD_TIME_DELAY = 3 days;
 
 contract moUSDToken is  ERC20, RoleControl(MOUSD_TIME_DELAY) {
     
