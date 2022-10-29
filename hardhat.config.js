@@ -2,7 +2,7 @@ require("@nomiclabs/hardhat-waffle");
 require("hardhat-interface-generator");
 require('@symblox/hardhat-abi-gen');
 require('hardhat-contract-sizer');
-
+require('solidity-coverage');
 require('dotenv').config()
 
 /**
