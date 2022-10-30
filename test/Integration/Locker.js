@@ -24,8 +24,7 @@ async function impersonateForToken(provider, receiver, ERC20, donerAddress, amou
 }
 
 
-
-describe("Integration tests: Locker contract", function() {
+describe.only("Integration tests: Locker contract", function() {
 
 
 
@@ -50,6 +49,8 @@ describe("Integration tests: Locker contract", function() {
     const rewards_distributor_address = addresses.optimism.Velo_Rewards_Distributor
     const sAMM_USDC_sUSD = addresses.optimism.sAMM_USDC_sUSD
     const vAMM_VELO_OP = addresses.optimism.vAMM_VELO_OP
+    const depositorAddress = "0x3460dc71a8863710d1c907b8d9d5dbc053a4102d"
+    
 
     const VELO_doner = "0x9a69A19f189585dA168C6f125aC23Db866CAFF11" //addresses.optimism.VELO_Doner
     console.log("DONER SETUP ", VELO_doner)
@@ -63,6 +64,15 @@ describe("Integration tests: Locker contract", function() {
     
     voting_escrow = new ethers.Contract(voting_escrow_address, ABIs.Voting_Escrow, provider)
     router = new ethers.Contract(router_address, ABIs.Router, provider)
+
+    let RD_ABI = [
+        "function claimable(uint256) external view returns(uint256)",
+        "function time_cursor_of(uint256) external view returns(uint256)",
+        "function start_time() external view returns(uint256)",
+        "function last_token_time() external view returns(uint256)"
+    ]
+
+    rewardsDistributor = new ethers.Contract(rewards_distributor_address, RD_ABI, provider)
     
 
     
@@ -78,6 +88,7 @@ describe("Integration tests: Locker contract", function() {
         return true
     }
     
+    let locker;
 
     before(async function() {
         //this.timeout(1000000);
@@ -95,7 +106,7 @@ describe("Integration tests: Locker contract", function() {
 
 
         //deploy locker
-        Locker = await ethers.getContractFactory("Locker")
+        const Locker = await ethers.getContractFactory("Locker")
         locker = await Locker.deploy(
             VELO.address, 
             voter.address, 
@@ -134,9 +145,7 @@ describe("Integration tests: Locker contract", function() {
 
     describe("lockVELO", function() {
         
-        // problem here, need NFT id prior to checking event so cannot check event as it occurs
-        // https://ethereum.stackexchange.com/questions/110004/testing-for-emitted-events-in-hardhat
-        //really fucked way to capture the arg then test after the fact?
+        
         it("Should lock specified VELO into veNFT", async function() {
             let balance_before = await VELO.balanceOf(locker.address)
             //call to lock velo and check emitted event
@@ -260,7 +269,7 @@ describe("Integration tests: Locker contract", function() {
                 //.withArgs(locker.address, ids[0], TEN_PERCENT);
                 
                 //.withArgs(ids[0], new_timestamp)
-
+            
             //const receipt = tx.wait()
             //const block = await ethers.provider.getBlock(tx.blockNumber);
             //console.log("EVENTS ", receipt.events)
@@ -492,6 +501,7 @@ describe("Integration tests: Locker contract", function() {
 
     });
 
+
     //This does not work as intended yet, function calls work but no rebase is claimed
     describe("claimRebaseMultiNFTs", function() {
         let amount = ethers.utils.parseEther('10000')
@@ -506,33 +516,50 @@ describe("Integration tests: Locker contract", function() {
             await locker.lockVELO(amount, FOUR_YEARS)
             
             //fetch veNFT IDs
-            //console.log("store IDs")
             ids.push(await locker.veNFTIds(0))
             ids.push(await locker.veNFTIds(1))
 
-            //vote for pool
+            //vote for pool to be realistic
             await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
            
             //timeskip into next epoch
             helpers.timeSkip(ONE_WEEK+1)
            
-            //view earned bribe
-            let bribe_token = OP.address
-            
-            //vote in new epoch to trigger checkpoint
-            await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
 
+            //set up the VELO minter so we can distribute global rebase/new tokens by calling update_period
+            let minter_ABI = [
+                "function update_period() external returns(uint256)",
+                
+            ]
+            minter = new ethers.Contract(depositorAddress, minter_ABI, provider)
 
+            //update period 
+            await minter.connect(alice).update_period()
+            //then timeskip to a new epoch again and update period again as 2 periods must pass before rebase can be claimed
+            helpers.timeSkip(ONE_WEEK+1)
+            await minter.connect(alice).update_period()
+
+            //check locked voting balances
             let balance_before = await voting_escrow.locked(ids[0])
-            console.log("voting balance ", balance_before)
+            let balance_before_2 = await voting_escrow.locked(ids[1])
+            
+            //check rebase claimable per veNFT, the same as each veNFT has the same locked token amounts
+            rewards = await rewardsDistributor.claimable(ids[0])
 
-
-            //claim rebase
             await locker.connect(alice).claimRebaseMultiNFTs(ids)
 
+            //check locked voting balances after claiming rebases
             let balance_after = await voting_escrow.locked(ids[0])
-            console.log("Blance after", balance_after)
+            let balance_after_2 = await voting_escrow.locked(ids[1])
+            
+            //verify expected behaviour
+            //first check is to prevent success when rewards are zero
             expect(balance_after.gt(balance_before)).to.equal(true)
+            expect(balance_after_2.gt(balance_before_2)).to.equal(true)
+
+            expect(balance_after).to.equal(balance_before.add(rewards))
+            expect(balance_after_2).to.equal(balance_before_2.add(rewards))
+            
         });
 
     });
