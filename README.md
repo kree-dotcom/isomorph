@@ -33,6 +33,8 @@ As borrowers will wish to use their MoUSD on other DeFi protocols it will vital 
 
 If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
 
+- Update MOUSD_TIME_DELAY in `moUSDToken.sol` to a shorter time than it's expected 3 days value. This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
+
 - Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again.
 
 # Slither results

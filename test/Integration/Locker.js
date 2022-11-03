@@ -24,7 +24,7 @@ async function impersonateForToken(provider, receiver, ERC20, donerAddress, amou
 }
 
 
-describe.only("Integration tests: Locker contract", function() {
+describe("Integration tests: Locker contract", function() {
 
 
 
