@@ -158,16 +158,14 @@ describe("Integration tests: Vault Synths contract", function () {
         
         contract = await ethers.getContractFactory("Vault_Synths");
         moUSDcontract = await ethers.getContractFactory("moUSDToken");
-        ISOcontract = await ethers.getContractFactory("isoToken");
-        treasuryContract = await ethers.getContractFactory("Treasury");
+
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
        
 
         moUSD = await moUSDcontract.deploy();
-        ISO = await ISOcontract.deploy(1);
         
 
-        treasury = await treasuryContract.deploy(moUSD.address, ISO.address);
+        treasury = addrs[1]
         collateralBook = await collateralContract.deploy(); 
         vault = await contract.deploy(moUSD.address, treasury.address, collateralBook.address);
         await collateralBook.addVaultAddress(vault.address, SYNTH);

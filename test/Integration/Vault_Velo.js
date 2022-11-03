@@ -93,8 +93,6 @@ describe("Integration tests: Vault_Velo contract", function () {
         //Router = await ethers.getContractFactory("TESTRouter")
         vaultContract = await ethers.getContractFactory("Vault_Velo")
         moUSDcontract = await ethers.getContractFactory("moUSDToken");
-        ISOcontract = await ethers.getContractFactory("isoToken");
-        treasuryContract = await ethers.getContractFactory("Treasury");
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
         
         const router_address = addresses.optimism.Router
@@ -121,10 +119,9 @@ describe("Integration tests: Vault_Velo contract", function () {
         const amount= ethers.utils.parseEther('0.1') //much smaller scale than unit tests as 1 pooledToken represents a lot of USDC/sUSD
         depositReceipt.connect(alice).UNSAFEMint(amount)
 
-        //deploy tokens and treasury
-        moUSD = await moUSDcontract.deploy();
-        ISO = await ISOcontract.deploy(1);
-        treasury = await treasuryContract.deploy(moUSD.address, ISO.address);
+        //deploy token and treasury
+        moUSD = await moUSDcontract.deploy()
+        treasury = addrs[1]
 
         //deploy vault and collateralBook
         collateralBook = await collateralContract.deploy(); 

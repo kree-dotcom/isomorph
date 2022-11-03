@@ -10,7 +10,7 @@ import "./RoleControl.sol";
 uint256 constant MOUSD_TIME_DELAY = 3 days;
 
 contract moUSDToken is  ERC20, RoleControl(MOUSD_TIME_DELAY) {
-    
+
     // Role based access control, minters can mint or burn moUSD
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");  
 

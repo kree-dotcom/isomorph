@@ -91,8 +91,7 @@ describe("Unit tests: Vault_Velo contract", function () {
         Router = await ethers.getContractFactory("TESTRouter")
         vaultContract = await ethers.getContractFactory("Vault_Velo")
         moUSDcontract = await ethers.getContractFactory("moUSDToken");
-        ISOcontract = await ethers.getContractFactory("isoToken");
-        treasuryContract = await ethers.getContractFactory("Treasury");
+        
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
         PriceOracle = await ethers.getContractFactory("TESTAggregatorV3")
 
@@ -113,10 +112,10 @@ describe("Unit tests: Vault_Velo contract", function () {
         const amount= ethers.utils.parseEther('1000')
         await depositReceipt.connect(alice).UNSAFEMint(amount)
 
-        //deploy tokens and treasury
+        //deploy token and treasury
         moUSD = await moUSDcontract.deploy();
-        ISO = await ISOcontract.deploy(1);
-        treasury = await treasuryContract.deploy(moUSD.address, ISO.address);
+   
+        treasury = addrs[1]
 
         //deploy vault and collateralBook
         collateralBook = await collateralContract.deploy(); 
