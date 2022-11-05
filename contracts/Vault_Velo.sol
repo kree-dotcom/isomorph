@@ -5,8 +5,7 @@
 pragma solidity =0.8.9; 
 pragma abicoder v2;
 
-import "./interfaces/IMoUSDToken.sol";
-import "./interfaces/ITreasury.sol";
+import "./interfaces/IisoUSDToken.sol";
 import "./interfaces/IVault.sol";
 import "hardhat/console.sol";
 
@@ -50,9 +49,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
     //these mappings store the loan details of each users loan against each collateral.
     //loan and interest, stored as a virtualPrice adjusted value 
-    mapping(address => mapping(address => uint256)) public moUSDLoanAndInterest;
+    mapping(address => mapping(address => uint256)) public isoUSDLoanAndInterest;
     //loan principle only, not adjusted by virtualPrice
-    mapping(address => mapping(address => uint256)) public moUSDLoaned;
+    mapping(address => mapping(address => uint256)) public isoUSDLoaned;
     //NFT ids relating to a specific loan
     mapping(address => mapping(address => NFTids)) internal loanNFTids;
 
@@ -71,8 +70,8 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
    
 
     
-    ITreasury public treasury;
-    IMoUSDToken public moUSD;
+    address public treasury;
+    IisoUSDToken public isoUSD;
     ICollateralBook public collateralBook;
     
 
@@ -118,16 +117,16 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     }
     
     constructor(
-        address _moUSD, //moUSD address
+        address _isoUSD, //isoUSD address
         address _treasury, //treasury address
         address _collateralBook //collateral structure book address
         ){
         //cd ("CURRENT BLOCK NUMBER", block.number);
-        require(_moUSD != address(0), "Zero Address used MOUSD");
+        require(_isoUSD != address(0), "Zero Address used isoUSD");
         require(_treasury != address(0), "Zero Address used Treasury");
         require(_collateralBook != address(0), "Zero Address used Collateral");
-        moUSD = IMoUSDToken(_moUSD);
-        treasury = ITreasury(_treasury);
+        isoUSD = IisoUSDToken(_isoUSD);
+        treasury = _treasury;
         collateralBook = ICollateralBook(_collateralBook);
         _setupRole(ADMIN_ROLE, msg.sender);
         _setupRole(PAUSER_ROLE, msg.sender);
@@ -252,21 +251,21 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     
 
      /**
-      * @notice Only Vaults can mint moUSD.
+      * @notice Only Vaults can mint isoUSD.
       * @dev internal function to handle increases of loan
-      * @param _loanAmount amount of moUSD to be borrowed, some is used to pay the opening fee the rest is sent to the user.
+      * @param _loanAmount amount of isoUSD to be borrowed, some is used to pay the opening fee the rest is sent to the user.
      **/
     function _increaseLoan(uint256 _loanAmount) internal {
         uint256 userMint;
         uint256 loanFee;
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
-        moUSD.mint(_loanAmount);
-        //moUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
+        isoUSD.mint(_loanAmount);
+        //isoUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
         //slither-disable-next-line unchecked-transfer
-        moUSD.transfer(msg.sender, userMint);
+        isoUSD.transfer(msg.sender, userMint);
         //slither-disable-next-line unchecked-transfer
-        moUSD.transfer(address(treasury), loanFee);
+        isoUSD.transfer(treasury, loanFee);
     }
     /// @dev internal function used to increase user collateral on loan.
     /// @param _depositReceipt the ERC721 compatible collateral to use, already set up in another function
@@ -281,7 +280,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     /// @param _loanNFTs structure containing the loan's NFT ids and the related slot it is stored in,
     /// @dev  should already be checked and verified before inputting to this function
     /// @param _partialPercentage percentage of the 4th NFT that will be liquidated (0-100%)
-    /// @param _USDReturned quantity of moUSD being returned to the vault, this can be zero.
+    /// @param _USDReturned quantity of isoUSD being returned to the vault, this can be zero.
     /// @param _interestPaid quantity of interest paid on closing loan, this is transfered to the treasury, this can be zero
     function _decreaseLoanOrCollateral(
         address _collateralAddress,
@@ -291,17 +290,17 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         uint256 _USDReturned,
         uint256 _interestPaid
         ) internal {
-        //only process moUSD if it's non-zero.
+        //only process isoUSD if it's non-zero.
         if (_USDReturned != 0){
             //_interestPaid is always less thn _USDReturned so this is safe.
             uint256 USDBurning = _USDReturned - _interestPaid;
             //slither-disable-next-line unchecked-transfer
-            moUSD.transferFrom(msg.sender, address(this), _USDReturned);
+            isoUSD.transferFrom(msg.sender, address(this), _USDReturned);
             //burn original loan principle
-            moUSD.burn(address(this), USDBurning);
+            isoUSD.burn(address(this), USDBurning);
             //transfer interest earned on loan to treasury
             //slither-disable-next-line unchecked-transfer
-            moUSD.transfer(address(treasury), _interestPaid);
+            isoUSD.transfer(treasury, _interestPaid);
         }
         _returnAndSplitNFTs(_collateralAddress, _loanHolder, _loanNFTs, _partialPercentage);
         
@@ -330,8 +329,8 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     */
 
     /**
-      * @notice Only Vaults can mint moUSD.
-      * @dev Mints 'USDborrowed' amount of moUSD to vault and transfers to msg.sender and emits transfer event.
+      * @notice Only Vaults can mint isoUSD.
+      * @dev Mints 'USDborrowed' amount of isoUSD to vault and transfers to msg.sender and emits transfer event.
       * @param _collateralAddress address of deposit receipt being used as loan collateral.
       * @param _owner the address of the loan holder
      **/
@@ -359,11 +358,11 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
 
      /**
-      * @notice Only Vaults can mint moUSD.
-      * @dev Mints 'USDborrowed' amount of moUSD to vault and transfers to msg.sender and emits transfer event.
+      * @notice Only Vaults can mint isoUSD.
+      * @dev Mints 'USDborrowed' amount of isoUSD to vault and transfers to msg.sender and emits transfer event.
       * @param _collateralAddress address of deposit receipt being used as loan collateral.
       * @param _NFTId the NFT id which maps the NFT to it's characteristics
-      * @param _USDborrowed amount of moUSD to be minted, it is then split into the amount sent and the opening fee.
+      * @param _USDborrowed amount of isoUSD to be minted, it is then split into the amount sent and the opening fee.
      **/
     function openLoan(
         address _collateralAddress,
@@ -400,7 +399,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) = _getCollateral(_collateralAddress);
 
         { //scoping to avoid stack too deep
-            uint256 existingLoan = moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice /LOAN_SCALE;
+            uint256 existingLoan = isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice /LOAN_SCALE;
             uint256 borrowMargin = ((_USDborrowed+ existingLoan) * minOpeningMargin) /LOAN_SCALE;
             uint256 existingCollateral = totalCollateralValue(_collateralAddress, msg.sender); 
             require( addedValue + existingCollateral >= borrowMargin, "Minimum margin not met!");
@@ -411,8 +410,8 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         
         _increaseLoan(_USDborrowed);
 
-        moUSDLoaned[_collateralAddress][msg.sender] = moUSDLoaned[_collateralAddress][msg.sender] + _USDborrowed;
-        moUSDLoanAndInterest[_collateralAddress][msg.sender] = moUSDLoanAndInterest[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);
+        isoUSDLoaned[_collateralAddress][msg.sender] = isoUSDLoaned[_collateralAddress][msg.sender] + _USDborrowed;
+        isoUSDLoanAndInterest[_collateralAddress][msg.sender] = isoUSDLoanAndInterest[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);
         NFTids storage userNFTs = loanNFTids[_collateralAddress][msg.sender];
         for(uint256 i =0; i < NFT_LIMIT; i++){
             //if this id slot isn't already full assign it
@@ -448,7 +447,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         //zero indexes cause problems with mappings and ownership, so refuse them
         require(_NFTId != 0, "No zero index NFTs allowed");
         uint256 existingCollateral = totalCollateralValue(_collateralAddress, msg.sender);
-        require( existingCollateral > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
+        require( existingCollateral > 0, "No existing collateral!"); 
         //checks msg.sender owns specified NFT id
         IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
         require(depositReceipt.ownerOf(_NFTId) == msg.sender, "Only NFT owner can openLoan");
@@ -466,7 +465,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             uint256 virtualPrice
         ) = _getCollateral(_collateralAddress);
         //We check adding the collateral brings the user above the liquidation point to avoid instantly being liquidated, poor UX 
-        uint256 USDborrowed = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
+        uint256 USDborrowed = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
         uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
         require(existingCollateral + addedValue >= borrowMargin, "Liquidation margin not met!");
     
@@ -493,15 +492,15 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
 
      /**
-      * @notice Only Vaults can destroy moUSD.
-      * @dev destroys USDreturned of moUSD held by caller, returns user collateral, close debt 
+      * @notice Only Vaults can destroy isoUSD.
+      * @dev destroys USDreturned of isoUSD held by caller, returns user collateral, close debt 
       * @dev if debt remains, checks minimum collateral ratio is upheld 
       * @dev we ignore debt less than $0.001 this value must be less than the tx cost of a transaction to avoid slowly draining value with microloans
       * @param _collateralAddress address of collateral token being used.
       * @param _loanNFTs structure containing the loan's NFT ids being returned and the related slot it is stored in,
       * @dev don't trust user input for this, always verify the ids match the user given slot before using.
       * @notice the final nftId slot is always used for the partially liquidating NFT (if any are used)
-      * @param _USDToVault amount of moUSD to be burnt.
+      * @param _USDToVault amount of isoUSD to be burnt.
       * @param _partialPercentage percentage of the final NFT that will be liquidated (0-100% in 10^18 scale)
      **/
 
@@ -531,13 +530,13 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) = _getCollateral(_collateralAddress);
         
         
-        uint256 moUSDdebt = (moUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        require( moUSDdebt >= _USDToVault, "Trying to return more moUSD than borrowed!");
-        uint256 outstandingMoUSD = moUSDdebt - _USDToVault;
+        uint256 isoUSDdebt = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
+        require( isoUSDdebt >= _USDToVault, "Trying to return more isoUSD than borrowed!");
+        uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
         uint256 colInUSD = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
-        if(outstandingMoUSD >= TENTH_OF_CENT){ //ignore debts less than $0.001
+        if(outstandingisoUSD >= TENTH_OF_CENT){ //ignore debts less than $0.001
             uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
-            uint256 borrowMargin = (outstandingMoUSD * minOpeningMargin) / LOAN_SCALE;
+            uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
             require(collateralLeft > borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
 
@@ -545,19 +544,19 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         {
-        //uint256 loanPrinciple = moUSDLoaned[_collateralAddress][msg.sender];
-        if( moUSDLoaned[_collateralAddress][msg.sender] >= _USDToVault){
+        //uint256 loanPrinciple = isoUSDLoaned[_collateralAddress][msg.sender];
+        if( isoUSDLoaned[_collateralAddress][msg.sender] >= _USDToVault){
             //pay off loan principle first
-            moUSDLoaned[_collateralAddress][msg.sender] = moUSDLoaned[_collateralAddress][msg.sender] - _USDToVault;
+            isoUSDLoaned[_collateralAddress][msg.sender] = isoUSDLoaned[_collateralAddress][msg.sender] - _USDToVault;
         }
         else{
-            interestPaid = _USDToVault - moUSDLoaned[_collateralAddress][msg.sender];
+            interestPaid = _USDToVault - isoUSDLoaned[_collateralAddress][msg.sender];
             //loan principle is fully repaid so record this.
-            moUSDLoaned[_collateralAddress][msg.sender] = 0;
+            isoUSDLoaned[_collateralAddress][msg.sender] = 0;
         }
         }
 
-        moUSDLoanAndInterest[_collateralAddress][msg.sender] = moUSDLoanAndInterest[_collateralAddress][msg.sender] - ((_USDToVault * LOAN_SCALE) / virtualPrice);
+        isoUSDLoanAndInterest[_collateralAddress][msg.sender] = isoUSDLoanAndInterest[_collateralAddress][msg.sender] - ((_USDToVault * LOAN_SCALE) / virtualPrice);
         
         
         //process return of NFTs now data validation is finished.
@@ -579,19 +578,18 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) internal view returns(uint256){
         //slither-disable-next-line uninitialized-local-variables
         uint256 proposedLiquidationAmount;
+        require(_partialPercentage <= LOAN_SCALE, "partialPercentage greater than 100%");
         for(uint256 i = 0; i < NFT_LIMIT; i++){
                 if(_loanNFTs.slots[i] < NFT_LIMIT){
-                    if(i == NFT_LIMIT -1){
+                    if((i == NFT_LIMIT -1) && (_partialPercentage > 0) && (_partialPercentage < LOAN_SCALE) ){
                         //final slot is NFT that will be split if necessary
-                        if((_partialPercentage > 0) ){
-                            //determine the proposed percentage of the NFT's liquidity being liquidated.
-                            require(_partialPercentage <= LOAN_SCALE, "partialPercentage greater than 100%");
-                            proposedLiquidationAmount += 
-                                                        (( _priceCollateral(IDepositReceipt(_collateralAddress), _loanNFTs.ids[i]) 
-                                                        *_partialPercentage)/ LOAN_SCALE);
-                        }
+                        proposedLiquidationAmount += 
+                                                    (( _priceCollateral(IDepositReceipt(_collateralAddress), _loanNFTs.ids[i]) 
+                                                    *_partialPercentage)/ LOAN_SCALE);
+                        
                     } 
                     else{
+                        
                         proposedLiquidationAmount += _priceCollateral(IDepositReceipt(_collateralAddress), _loanNFTs.ids[i]);
                     }
                 }
@@ -633,34 +631,34 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         uint256 _collateralLiquidated,
         CollateralNFTs calldata _loanNFTs,
         uint256 _partialPercentage,
-        uint256 _moUSDReturned,
+        uint256 _isoUSDReturned,
         bytes32 _currencyKey, 
         uint256 _virtualPrice
         ) internal {
         //record paying off loan principle before interest
-        uint256 loanPrinciple = moUSDLoaned[_collateralAddress][_loanHolder];
+        uint256 loanPrinciple = isoUSDLoaned[_collateralAddress][_loanHolder];
         //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
-        if( loanPrinciple >= _moUSDReturned){
+        if( loanPrinciple >= _isoUSDReturned){
             //pay off loan principle first
-            moUSDLoaned[_collateralAddress][_loanHolder] = loanPrinciple - _moUSDReturned;
+            isoUSDLoaned[_collateralAddress][_loanHolder] = loanPrinciple - _isoUSDReturned;
         }
         else {
-            interestPaid = _moUSDReturned - loanPrinciple;
+            interestPaid = _isoUSDReturned - loanPrinciple;
             //loan principle is fully repaid so record this.
-            moUSDLoaned[_collateralAddress][_loanHolder] = 0;
+            isoUSDLoaned[_collateralAddress][_loanHolder] = 0;
         }
 
         //if non-zero we are not handling a bad debt so the loanAndInterest will need updating
         // this is semantic overloading so we must be careful here
-        if(moUSDLoanAndInterest[_collateralAddress][_loanHolder] > 0){
-            moUSDLoanAndInterest[_collateralAddress][_loanHolder] = 
-                moUSDLoanAndInterest[_collateralAddress][_loanHolder] - 
-                ((_moUSDReturned * LOAN_SCALE) / _virtualPrice);
+        if(isoUSDLoanAndInterest[_collateralAddress][_loanHolder] > 0){
+            isoUSDLoanAndInterest[_collateralAddress][_loanHolder] = 
+                isoUSDLoanAndInterest[_collateralAddress][_loanHolder] - 
+                ((_isoUSDReturned * LOAN_SCALE) / _virtualPrice);
         }
-        else{ //here as moUSDLoanAndInterest are zero we must be handling a baddebt or complete payoff 
+        else{ //here as isoUSDLoanAndInterest are zero we must be handling a baddebt or complete payoff 
             //so  we wipe the principle as we are finished using it
-            moUSDLoaned[_collateralAddress][_loanHolder] = 0;
+            isoUSDLoaned[_collateralAddress][_loanHolder] = 0;
         }
         
 
@@ -669,14 +667,14 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             _loanHolder,
             _loanNFTs,
             _partialPercentage,
-            _moUSDReturned,
+            _isoUSDReturned,
             interestPaid
         );
         
         emit LiquidationNFT(
             _loanHolder, 
             msg.sender,
-            _moUSDReturned, 
+            _isoUSDReturned, 
             _currencyKey, 
             _collateralLiquidated
         );
@@ -742,26 +740,28 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
                 uint256 virtualPrice
             ) = _getCollateral(_collateralAddress);
             
-            uint256 moUSDBorrowed = (moUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
+            uint256 isoUSDBorrowed = (isoUSDLoanAndInterest[_collateralAddress][_loanHolder] * virtualPrice) / LOAN_SCALE;
             uint256 totalUserCollateral = totalCollateralValue(_collateralAddress, _loanHolder);
             uint256 proposedLiquidationAmount;
             { //scope block for liquidationAmount due to stack too deep
-                uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, 1 ether, moUSDBorrowed, liquidatableMargin);
+                uint256 liquidationAmount = viewLiquidatableAmount(totalUserCollateral, 1 ether, isoUSDBorrowed, liquidatableMargin);
                 require(liquidationAmount > 0 , "Loan not liquidatable");
             
                 proposedLiquidationAmount = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
                 require(proposedLiquidationAmount <= liquidationAmount, "excessive liquidation suggested");
                 
             }
-            uint256 moUSDreturning = proposedLiquidationAmount*LIQUIDATION_RETURN/LOAN_SCALE;
+            uint256 isoUSDreturning = proposedLiquidationAmount*LIQUIDATION_RETURN/LOAN_SCALE;
             
             //if complete liquidation falls short of recovering the position we settle for complete liquidation
             if(proposedLiquidationAmount >= totalUserCollateral){
-                if(moUSDBorrowed > moUSDreturning){
+                proposedLiquidationAmount = totalUserCollateral;
+                isoUSDreturning = proposedLiquidationAmount*LIQUIDATION_RETURN/LOAN_SCALE;
+                if(isoUSDBorrowed > isoUSDreturning){
                     //if a user is being fully liquidated we will forgive any remaining debt so it
                     // doesn't roll over if they open a new loan of the same collateral.
-                    emit BadDebtClearedNFT(_loanHolder, msg.sender, moUSDBorrowed - moUSDreturning, currencyKey);
-                    moUSDLoanAndInterest[_collateralAddress][_loanHolder] = 0;
+                    emit BadDebtClearedNFT(_loanHolder, msg.sender, isoUSDBorrowed - isoUSDreturning, currencyKey);
+                    isoUSDLoanAndInterest[_collateralAddress][_loanHolder] = 0;
                 }
             }    
             
@@ -769,9 +769,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
                 _loanHolder,
                 _collateralAddress,
                 proposedLiquidationAmount,
-                _loanNFTs, //is it safe to use this, verify
+                _loanNFTs, 
                 _partialPercentage,
-                moUSDreturning,
+                isoUSDreturning,
                 currencyKey,
                 virtualPrice
                 );

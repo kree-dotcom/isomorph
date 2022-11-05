@@ -11,10 +11,10 @@ contract TEST_Vault_Lyra is Vault_Lyra {
     //without Greeks going stale and being unupdatable due to time passed.
 
     constructor(
-        address _moUSD, //moUSD address
+        address _isoUSD, //isoUSD address
         address _treasury, //treasury address
         address _collateralBook //collateral structure book address
-        ) Vault_Lyra(_moUSD, _treasury, _collateralBook){}
+        ) Vault_Lyra(_isoUSD, _treasury, _collateralBook){}
         
     function TESTalterVirtualPrice(address _collateralAddress, uint256 newVirtualPrice) public {
         collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, newVirtualPrice, block.timestamp);

@@ -13,17 +13,17 @@ Hence a bespoke platform that can specialise in these novel products is a logica
 
 ## Design:
 
-Isomorph aims to solve these issues by designing a platform by which novel asset holders can borrow a new stablecoin, MoUSD, using their asset as collateral against which the lending is secured. The protocol mints MoUSD into existence as required relieving the need for a counterparty providing USD capital, this enables a greater degree of control over interest rates that can be tailored to demand. 
+Isomorph aims to solve these issues by designing a platform by which novel asset holders can borrow a new stablecoin, isoUSD, using their asset as collateral against which the lending is secured. The protocol mints isoUSD into existence as required relieving the need for a counterparty providing USD capital, this enables a greater degree of control over interest rates that can be tailored to demand. 
 
-When assets are deposited the user will be able to mint moUSD at varying ratios to the asset value, dependant on how volatile their price tends to be. 
+When assets are deposited the user will be able to mint isoUSD at varying ratios to the asset value, dependant on how volatile their price tends to be. 
 
 At launch Isomorph will support several Synthetix synths, Lyra Option Pool tokens on Optimism and some Velodrome liquidity tokens with plans to expand these ranges of novel assets as well as including other protocols.
 
- By using moUSD loans liquidity providers will be able to leverage their exposure to pools and so compound their returns, gaining better returns on their employed capital. Alternative they can use the loan for tax management (dependent on location) and daily costs while letting the underlying collateral appreciate. This general strategy shall be repeated for other platforms enabling sustainable returns to be generated for the Isomorph system. 
+ By using isoUSD loans liquidity providers will be able to leverage their exposure to pools and so compound their returns, gaining better returns on their employed capital. Alternative they can use the loan for tax management (dependent on location) and daily costs while letting the underlying collateral appreciate. This general strategy shall be repeated for other platforms enabling sustainable returns to be generated for the Isomorph system. 
 
 ## Stability of MoUSD:
 
-As borrowers will wish to use their MoUSD on other DeFi protocols it will vital to have a highly liquid trading pool composed of MoUSD and other popular stablecoins. This will be achieved via a Curve style Metapool consisting of MoUSD, and other stablecoins. To promote liquidity providing this pool shall be incentivized, though the source of these incentives has yet to be decided.
+As borrowers will wish to use their isoUSD on other DeFi protocols it will vital to have a highly liquid trading pool allowing swapping of isoUSD to other popular stablecoins. This will be achieved via a Velodrome stable pool consisting of isoUSD and USDC. To promote liquidity providing this pool shall be incentivized, this will be achieved by a mixture of direct veVELO voting by Isomorph and bribes to incentivize other voters to vote for the pool. These votes in turn will result in VELO emissions being directed to the stakers of the isoUSD/USDC pool. 
 
 ## Tests:
 
@@ -33,7 +33,7 @@ As borrowers will wish to use their MoUSD on other DeFi protocols it will vital 
 
 If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
 
-- Update MOUSD_TIME_DELAY in `moUSDToken.sol` to a shorter time than it's expected 3 days value. This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
+- Update ISOUSD_TIME_DELAY in `isoUSDToken.sol` to a shorter time than it's expected 3 days value. This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
 
 - Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again.
 

@@ -1,10 +1,10 @@
 pragma solidity =0.8.9;
 
-import "../moUSDToken.sol";
+import "../isoUSDToken.sol";
 //*************************************
 //TEST CODE ONLY DO NOT USE ON MAINNET 
 //*************************************
-contract TESTmoUSDToken is moUSDToken {
+contract TESTisoUSDToken is isoUSDToken {
     constructor(){
         //extra mint command to verify functionality in tests
         _mint(msg.sender, 10 ether);
