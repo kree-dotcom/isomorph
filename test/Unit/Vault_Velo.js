@@ -4,6 +4,7 @@ const { ethers } = require("hardhat");
 const { helpers } = require("../testHelpers.js")
 
 const BLOCK_HEIGHT = 13908578;//5th Jan 2022
+
 const base = ethers.BigNumber.from('1000000000000000000'); // 1eth
 
 
@@ -1192,7 +1193,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.be.revertedWith("Pausable: paused");     
     });
     
-    it.only("Should fail if collateral partialPercentage is greater than 100%", async function () {
+    it("Should fail if collateral partialPercentage is greater than 100%", async function () {
       const NFTId = 1;
       let realDebt = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);

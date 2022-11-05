@@ -1,6 +1,6 @@
 # Isomorph
 
-An Optimism based loans platform
+Isomorph is an Optimism naitve lending protocol where users can provide a variety of interest generating collaterals to mint the isoUSD stablecoin.
 
 ## Motivation:
 
@@ -21,7 +21,7 @@ At launch Isomorph will support several Synthetix synths, Lyra Option Pool token
 
  By using isoUSD loans liquidity providers will be able to leverage their exposure to pools and so compound their returns, gaining better returns on their employed capital. Alternative they can use the loan for tax management (dependent on location) and daily costs while letting the underlying collateral appreciate. This general strategy shall be repeated for other platforms enabling sustainable returns to be generated for the Isomorph system. 
 
-## Stability of MoUSD:
+## Stability of isoUSD:
 
 As borrowers will wish to use their isoUSD on other DeFi protocols it will vital to have a highly liquid trading pool allowing swapping of isoUSD to other popular stablecoins. This will be achieved via a Velodrome stable pool consisting of isoUSD and USDC. To promote liquidity providing this pool shall be incentivized, this will be achieved by a mixture of direct veVELO voting by Isomorph and bribes to incentivize other voters to vote for the pool. These votes in turn will result in VELO emissions being directed to the stakers of the isoUSD/USDC pool. 
 
@@ -33,7 +33,7 @@ As borrowers will wish to use their isoUSD on other DeFi protocols it will vital
 
 If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
 
-- Update ISOUSD_TIME_DELAY in `isoUSDToken.sol` to a shorter time than it's expected 3 days value. This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
+- Update ISOUSD_TIME_DELAY in isoUSDToken.sol to a shorter time than it's expected 3 days value.  This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
 
 - Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again.
 

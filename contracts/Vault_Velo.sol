@@ -544,13 +544,13 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         //slither-disable-next-line uninitialized-local-variables
         uint256 interestPaid;
         {
-        //uint256 loanPrinciple = isoUSDLoaned[_collateralAddress][msg.sender];
-        if( isoUSDLoaned[_collateralAddress][msg.sender] >= _USDToVault){
+        uint256 loanPrinciple = isoUSDLoaned[_collateralAddress][msg.sender];
+        if( loanPrinciple >= _USDToVault){
             //pay off loan principle first
-            isoUSDLoaned[_collateralAddress][msg.sender] = isoUSDLoaned[_collateralAddress][msg.sender] - _USDToVault;
+            isoUSDLoaned[_collateralAddress][msg.sender] = loanPrinciple - _USDToVault;
         }
         else{
-            interestPaid = _USDToVault - isoUSDLoaned[_collateralAddress][msg.sender];
+            interestPaid = _USDToVault - loanPrinciple;
             //loan principle is fully repaid so record this.
             isoUSDLoaned[_collateralAddress][msg.sender] = 0;
         }

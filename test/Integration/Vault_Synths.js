@@ -127,6 +127,7 @@ describe("Integration tests: Vault Synths contract", function () {
   const base = ethers.utils.parseEther('1'); // 1eth
   const threeMinInterest = 100000180 //119710969;
   let liq_return //grabs LIQUIDATION_RETURN constant after setting up vault contract.
+  const TIME_DELAY = 3 //3 seconds to avoid Synthetix price feeds becoming stale with the normal 3 day value.
   
   //identifiers for collateral settings
   const SYNTH = 0;

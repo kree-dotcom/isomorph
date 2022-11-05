@@ -121,6 +121,7 @@ describe("Integration tests: Vault Lyra contract", function () {
   const base = ethers.utils.parseEther('1'); // 1eth
   const threeMinInterest = 100000180 //119710969;
   let liq_return //grabs LIQUIDATION_RETURN constant after setting up vault contract.
+
   
   //identifiers for collateral settings
   const SYNTH = 0;
@@ -1572,7 +1573,7 @@ describe("Integration tests: Vault Lyra contract", function () {
 
 
   describe("Role based access control", function () {
-    const TIME_DELAY = 3 * 24 *60 *60 +1 //3 days
+    const TIME_DELAY = 3+1 //3 second timelock +1 
     const PAUSER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PAUSER_ROLE"));
     const ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE"));
     beforeEach(async function (){

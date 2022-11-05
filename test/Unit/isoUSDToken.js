@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 const { ZERO_ADDRESS } = require("@openzeppelin/test-helpers/src/constants");
 const { helpers } = require("../testHelpers.js")
 
-const TIME_DELAY = 3 * 24 *60 *60 +1 //3 days
+const TIME_DELAY = 3 * 24 *60 *60 +1 //3 days + 1s
 const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
 
 describe("Unit tests: isoUSD contract", function () {
