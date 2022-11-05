@@ -121,7 +121,7 @@ describe("Integration tests: Vault_Velo contract", function () {
         depositReceipt.connect(alice).UNSAFEMint(amount)
 
         //deploy token and treasury
-        isoUSD = await isoUSDcontract.deploy(TIME_DELAY)
+        isoUSD = await isoUSDcontract.deploy()
         treasury = addrs[1]
 
         //deploy vault and collateralBook
