@@ -1,16 +1,13 @@
-interface IVault_Synths {
+interface IVault_Lyra {
   function DEFAULT_ADMIN_ROLE (  ) external view returns ( bytes32 );
-  function EXCHANGE_RATES (  ) external view returns ( address );
   function LIQUIDATION_RETURN (  ) external view returns ( uint256 );
   function PAUSER_ROLE (  ) external view returns ( bytes32 );
-  function PROXY_ERC20 (  ) external view returns ( address );
-  function SUSD_ADDR (  ) external view returns ( address );
-  function SYSTEM_STATUS (  ) external view returns ( address );
   function actionNonce (  ) external view returns ( uint256 );
   function action_queued ( bytes32 ) external view returns ( uint256 );
   function addRole ( address _account, bytes32 _role ) external;
   function callLiquidation ( address _loanHolder, address _collateralAddress ) external;
   function closeLoan ( address _collateralAddress, uint256 _collateralToUser, uint256 _USDToVault ) external;
+  function collateralBook (  ) external view returns ( address );
   function collateralPosted ( address, address ) external view returns ( uint256 );
   function dailyMax (  ) external view returns ( uint256 );
   function dailyTotal (  ) external view returns ( uint256 );
@@ -19,6 +16,7 @@ interface IVault_Synths {
   function grantRole ( bytes32 role, address account ) external;
   function hasRole ( bytes32 role, address account ) external view returns ( bool );
   function increaseCollateralAmount ( address _collateralAddress, uint256 _colAmount ) external;
+  function isoUSD (  ) external view returns ( address );
   function isoUSDLoanAndInterest ( address, address ) external view returns ( uint256 );
   function isoUSDLoaned ( address, address ) external view returns ( uint256 );
   function loanOpenFee (  ) external view returns ( uint256 );
