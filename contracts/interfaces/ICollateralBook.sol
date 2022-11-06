@@ -25,7 +25,7 @@ interface ICollateralBook {
   function addVaultAddress ( address _vault, uint256 _assetType ) external;
   function changeCollateralType (  ) external;
   function collateralPaused ( address ) external view returns ( bool );
-  function collateralProps(address) external returns(Collateral memory collateral);
+  function collateralProps(address) external view returns(Collateral memory collateral);
   function collateralValid ( address ) external view returns ( bool );
   function getRoleAdmin ( bytes32 role ) external view returns ( bytes32 );
   function grantRole ( bytes32 role, address account ) external;

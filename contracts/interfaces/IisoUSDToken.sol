@@ -15,14 +15,14 @@ interface IisoUSDToken {
   function hasRole ( bytes32 role, address account ) external view returns ( bool );
   function increaseAllowance ( address spender, uint256 addedValue ) external returns ( bool );
   function mint ( uint256 _amount ) external;
-  function name (  ) external view returns ( string );
+  function name (  ) external view returns ( string memory );
   function previous_action_hash (  ) external view returns ( bytes32 );
   function proposeAddRole ( address _account, bytes32 _role ) external;
   function removeRole ( address _account, bytes32 _role ) external;
   function renounceRole ( bytes32 role, address account ) external;
   function revokeRole ( bytes32 role, address account ) external;
   function supportsInterface ( bytes4 interfaceId ) external view returns ( bool );
-  function symbol (  ) external view returns ( string );
+  function symbol (  ) external view returns ( string memory);
   function totalSupply (  ) external view returns ( uint256 );
   function transfer ( address to, uint256 amount ) external returns ( bool );
   function transferFrom ( address from, address to, uint256 amount ) external returns ( bool );
