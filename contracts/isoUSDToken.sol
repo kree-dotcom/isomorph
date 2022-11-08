@@ -7,7 +7,7 @@ pragma solidity =0.8.9;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./RoleControl.sol";
 
-uint256 constant ISOUSD_TIME_DELAY = 3 days;
+uint256 constant ISOUSD_TIME_DELAY = 3;// days;
 
 contract isoUSDToken is  ERC20, RoleControl(ISOUSD_TIME_DELAY) {
 

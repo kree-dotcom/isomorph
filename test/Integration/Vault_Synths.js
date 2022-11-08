@@ -607,7 +607,7 @@ describe("Integration tests: Vault Synths contract", function () {
       //we request a loan that places us slightly over the maximum loan allowed
       const loanIncrease = ethers.utils.parseEther('354');
       //let virtualPrice = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
-      await expect(vault.connect(addr1).openLoan(sUSD.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr1).openLoan(sUSD.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
       
     });
 
@@ -616,7 +616,7 @@ describe("Integration tests: Vault Synths contract", function () {
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
       const beforeTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('300');
-      await expect(vault.connect(addr2).openLoan(sUSD.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr2).openLoan(sUSD.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
       
     });
     
@@ -641,7 +641,7 @@ describe("Integration tests: Vault Synths contract", function () {
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
       const beforeTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('3000');
-      await expect(vault.connect(addr1).openLoan(sUSD.address, 0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr1).openLoan(sUSD.address, 0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
     });
     
     
@@ -1445,7 +1445,7 @@ describe("Integration tests: Vault Synths contract", function () {
     });
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
-      await expect(vault.connect(owner).setDailyMax(billion)).to.be.revertedWith(""); 
+      await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
     });       
   
     
@@ -1468,7 +1468,7 @@ describe("Integration tests: Vault Synths contract", function () {
     });
     it("Should fail with values larger than 10**17 (10%)", async function () {
       const wrongMax = ethers.utils.parseEther("0.11");
-      await expect(vault.connect(owner).setOpenLoanFee(wrongMax)).to.be.revertedWith(""); 
+      await expect(vault.connect(owner).setOpenLoanFee(wrongMax)).to.be.reverted; 
     });       
   
     

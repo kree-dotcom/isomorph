@@ -1662,7 +1662,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       //non-used slots can have any NFT id so long as they aren't owned by the loanHolder so here we use #9.
       const collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED,0]];
       //call the liquidation
-      await expect(vault.connect(alice).callLiquidation(loanHolder, bob.address, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral");
+      await expect(vault.connect(alice).callLiquidation(loanHolder, bob.address, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral!");
 
     });
     
@@ -1690,7 +1690,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       //non-used slots can have any NFT id so long as they aren't owned by the loanHolder so here we use #9.
       const collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED,0]];
       //call the liquidation
-      await expect(vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral");      
+      await expect(vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral!");      
     });
 
 
@@ -1717,7 +1717,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       //non-used slots can have any NFT id so long as they aren't owned by the loanHolder so here we use #9.
       const collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED,0]];
       //call the liquidation
-      await expect(vault.connect(alice).callLiquidation(loanHolder, ZERO_ADDRESS, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral");      
+      await expect(vault.connect(alice).callLiquidation(loanHolder, ZERO_ADDRESS, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral!");      
     });
 
     it("Should fail to liquidate if the debtor address is not set", async function () {
@@ -1777,7 +1777,7 @@ describe("Integration tests: Vault_Velo contract", function () {
     });
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
-      await expect(vault.connect(owner).setDailyMax(billion)).to.be.revertedWith(""); 
+      await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
     });       
   
     

@@ -72,9 +72,8 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     
     /// @notice basic checks to verify collateral being used exists
     /// @dev should be called by any external function modifying a loan
-     modifier collateralExists(address _collateralAddress){
+    function _collateralExists(address _collateralAddress) internal {
         require(collateralBook.collateralValid(_collateralAddress), "Unsupported collateral!");
-        _;
     }
 
     modifier onlyPauser{
@@ -330,8 +329,9 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         address _collateralAddress,
         uint256 _colAmount,
         uint256 _USDborrowed
-        ) external whenNotPaused collateralExists(_collateralAddress) 
+        ) external whenNotPaused 
         {
+        _collateralExists(_collateralAddress);
         IERC20 collateral = IERC20(_collateralAddress);
         
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
@@ -381,8 +381,9 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external whenNotPaused collateralExists(_collateralAddress) 
+        ) external whenNotPaused 
         {
+        _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
         require(_colAmount > 0 , "Zero amount"); //Not strictly needed, prevents event spamming though
         //make sure virtual price is related to current time before fetching collateral details
@@ -431,8 +432,9 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external whenNotPaused collateralExists(_collateralAddress) 
+        ) external whenNotPaused  
         {
+        _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
         //make sure virtual price is related to current time before fetching collateral details
         //slither-disable-next-line reentrancy-vulnerabilities-1
@@ -564,8 +566,9 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external whenNotPaused collateralExists(_collateralAddress) 
+        ) external whenNotPaused  
         {   
+            _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 
              //make sure virtual price is related to current time before fetching collateral details
             //slither-disable-next-line reentrancy-vulnerabilities-1

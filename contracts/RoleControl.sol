@@ -6,7 +6,7 @@ contract RoleControl is AccessControl{
 
     // admin address can add  after `TIME_DELAY` has passed.
     // admin address can also remove minters or pause minting, no time delay needed.
-    bytes32 internal constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public previous_action_hash = 0x0;
     uint256 private immutable TIME_DELAY;
     mapping(bytes32 => uint256) public action_queued;

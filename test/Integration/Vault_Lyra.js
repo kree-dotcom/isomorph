@@ -212,7 +212,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       const loanTaken = ethers.utils.parseEther('500');
 
     it("Should mint user isoUSD if given valid conditions at time zero and emit OpenLoan event", async function () {
-
+      this.timeout(100000);
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address)
       const beforeCollateralAddr1Balance = await lyraLPToken.balanceOf(addr1.address)
       const beforeTreasuryBalance = await isoUSD.balanceOf(treasury.address);
@@ -601,14 +601,14 @@ describe("Integration tests: Vault Lyra contract", function () {
       let maxLoanIncrease = maxLoanPossible.sub(loanTaken)
       //we request a loan that places us slightly over the maximum loan allowed
       const loanIncrease = maxLoanIncrease.mul(102).div(100)
-      await expect(vault.connect(addr1).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr1).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
       
     });
 
     it("Should fail if the user has no existing loan", async function () {
       
       const loanIncrease = ethers.utils.parseEther('300');
-      await expect(vault.connect(addr2).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr2).openLoan(lyraLPToken.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
       
     });
     
@@ -628,7 +628,7 @@ describe("Integration tests: Vault Lyra contract", function () {
     it("Should fail if sender requests too much isoUSD", async function () {
 
       const loanIncrease = ethers.utils.parseEther('3000');
-      await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0, loanIncrease)).to.be.revertedWith("Minimum margin not met");
+      await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
     });
     
     
@@ -1542,7 +1542,7 @@ describe("Integration tests: Vault Lyra contract", function () {
     });
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
-      await expect(vault.connect(owner).setDailyMax(billion)).to.be.revertedWith(""); 
+      await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
     });       
   
     
@@ -1565,7 +1565,7 @@ describe("Integration tests: Vault Lyra contract", function () {
     });
     it("Should fail with values larger than 10**17 (10%)", async function () {
       const wrongMax = ethers.utils.parseEther("0.11");
-      await expect(vault.connect(owner).setOpenLoanFee(wrongMax)).to.be.revertedWith(""); 
+      await expect(vault.connect(owner).setOpenLoanFee(wrongMax)).to.be.reverted; 
     });       
   
     
@@ -1573,7 +1573,7 @@ describe("Integration tests: Vault Lyra contract", function () {
 
 
   describe("Role based access control", function () {
-    const TIME_DELAY = 3+1 //3 second timelock +1 
+    const TIME_DELAY = 3*24*60*60+1 //3 day second timelock +1s
     const PAUSER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("PAUSER_ROLE"));
     const ADMIN = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE"));
     beforeEach(async function (){
