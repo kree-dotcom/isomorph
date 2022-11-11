@@ -5,7 +5,7 @@ const { addresses } = require("../deployedAddresses.js")
 const { ABIs } = require("../abi.js")
 const { helpers } = require("../testHelpers.js")
 const { getMarketDeploys } = require('@lyrafinance/protocol');
-const { OptionGreekCache__factory } = require("@lyrafinance/protocol/dist/typechain-types/index.js");
+
 
 
 async function impersonateForToken(provider, receiver, ERC20, donerAddress, amount) {
