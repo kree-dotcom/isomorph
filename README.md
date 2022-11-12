@@ -25,9 +25,10 @@ At launch Isomorph will support several Synthetix synths, Lyra Option Pool token
 
 As borrowers will wish to use their isoUSD on other DeFi protocols it will vital to have a highly liquid trading pool allowing swapping of isoUSD to other popular stablecoins. This will be achieved via a Velodrome stable pool consisting of isoUSD and USDC. To promote liquidity providing this pool shall be incentivized, this will be achieved by a mixture of direct veVELO voting by Isomorph and bribes to incentivize other voters to vote for the pool. These votes in turn will result in VELO emissions being directed to the stakers of the isoUSD/USDC pool. 
 
-## Tests:
+## Tests and coverage:
 
 - Begin by cloning the repo
+- The repo contains a submodule so run `git submodule init && git submodule update` to get these files for Velo-Deposit-Tokens.
 - Then run "yarn install" in the main directory to install all required packages
 - Connect your API endpoints and privatekey using the .env file. See sample_env for details.
 
@@ -35,7 +36,28 @@ If you swap to a different network you will need to update the static addresses 
 
 - Update ISOUSD_TIME_DELAY in isoUSDToken.sol to a shorter time than it's expected 3 days value.  This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
 
-- Then run "npx hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again.
+- Then run "yarn hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again. The first test run will likely be much slower due to needing to fetch contract information at the fork block height. We use this block height for integration testing as we know all token doners have the balances we need to borrow at this height. If the block height is changed be aware tests using Synths or Lyra systems may fail if the respective external system's circuit breaker is in effect.
+
+Coverage is currently as follows:
+---------------------------------|----------|----------|----------|----------|----------------|
+File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
+---------------------------------|----------|----------|----------|----------|----------------|
+ contracts/                      |    97.73 |    86.65 |    94.87 |    96.41 |                |
+  CollateralBook.sol             |       98 |    82.89 |    93.33 |    98.68 |             81 |
+  ConfirmedOwnerWithProposal.sol |    33.33 |    33.33 |    42.86 |    35.29 |... 54,61,63,65 |
+  Locker.sol                     |      100 |      100 |      100 |      100 |                |
+  RoleControl.sol                |      100 |    85.71 |      100 |      100 |                |
+  Vault_Lyra.sol                 |      100 |     88.1 |      100 |    97.55 |157,158,510,512 |
+  Vault_Synths.sol               |      100 |    91.11 |      100 |    98.66 |        512,514 |
+  Vault_Velo.sol                 |    98.15 |    87.27 |    96.43 |    97.01 |... 426,647,649 |
+  isoUSDToken.sol                |      100 |      100 |      100 |      100 |                |
+---------------------------------|----------|----------|----------|----------|----------------|
+All files                        |    97.73 |    86.65 |    94.87 |    96.41 |                |
+---------------------------------|----------|----------|----------|----------|----------------|
+
+Please note ConfirmedOwnerWithProposal.sol was written by Chainlink and so can be ignored.
+
+
 
 # Slither results
 Running slither . --filter-paths "contracts/tests|node_modules|contracts/Migrations|contracts/helper|contracts/interfaces|contracts/ConfirmedOwnerWithProposal"
