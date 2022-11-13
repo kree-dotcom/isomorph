@@ -52,9 +52,12 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
 
     //This fee paid to the protocol by user on opening a loan
     uint256 public loanOpenFee = 1 ether /100; //1 percent opening fee.
-
     
+    //The treasury is where moUSD fees are paid, to keep this upgradable we allow changing by the admin, after a timelock period
     address public treasury;
+    address public pendingTreasury;
+    uint256 public updateTreasuryTimestamp;
+
     IisoUSDToken public isoUSD;
     ICollateralBook public collateralBook;    
    
@@ -66,6 +69,7 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
     event BadDebtCleared(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
+    event ChangeTreasury(address oldTreasury, address newTreasury);
 
     event SystemPaused(address indexed pausedBy);
     event SystemUnpaused(address indexed unpausedBy);
@@ -129,6 +133,22 @@ contract Vault_Lyra is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_newOpenLoanFee <= 1 ether /10 ); 
         emit ChangeOpenLoanFee(_newOpenLoanFee, loanOpenFee); //ignoring CEI pattern here
         loanOpenFee = _newOpenLoanFee;
+    }
+
+    /// @notice admin only function to queue treasury address change which must wait the timelock period before being implemented
+    function proposeTreasury(address _newTreasury) external onlyAdmin {
+        require(_newTreasury != address(0)); 
+        pendingTreasury = _newTreasury;
+        updateTreasuryTimestamp = block.timestamp + VAULT_TIME_DELAY;
+    }
+
+    /// @notice admin only function to change treasury target after timelock delay
+    function setTreasury() external onlyAdmin {
+        require(updateTreasuryTimestamp < block.timestamp); 
+        address copyOfPendingTreasury = pendingTreasury;
+        require(copyOfPendingTreasury != address(0));
+        emit ChangeTreasury(treasury, copyOfPendingTreasury); //ignoring CEI pattern here
+        treasury = copyOfPendingTreasury;
     }
 
     /**

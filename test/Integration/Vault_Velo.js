@@ -1783,6 +1783,48 @@ describe("Integration tests: Vault_Velo contract", function () {
     
   });
 
+  describe("setTreasury", function () {
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(alice).setTreasury()).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should revert if no treasury change is pending", async function () {
+      await expect( vault.connect(owner).setTreasury()).to.be.reverted; 
+    });
+    it("Should succeed if change is pending and only when timelock has passed", async function () {
+      old_treasury = await vault.treasury()
+      new_treasury = alice.address
+      await vault.connect(owner).proposeTreasury(new_treasury)
+      //check set call reverts when timelock has not passed
+      await expect( vault.connect(owner).setTreasury()).to.be.reverted; 
+      //skip time past timelock deadline
+      helpers.timeSkip(TIME_DELAY);
+      await expect( vault.connect(owner).setTreasury()).to.emit(vault, 'ChangeTreasury').withArgs(old_treasury, new_treasury)
+    });       
+  
+    
+  });
+
+  describe("proposeTreasury", function () {
+    
+    it("Should not allow anyone to call it", async function () {
+      const new_treasury = alice.address
+      await expect( vault.connect(alice).proposeTreasury(new_treasury)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should revert if zero address is propose as treasury", async function () {
+      await expect( vault.connect(owner).proposeTreasury(ZERO_ADDRESS)).to.be.reverted; 
+    });
+    it("Should succeed if given valid conditions", async function () {
+      old_treasury = await vault.treasury()
+      const new_treasury = alice.address
+      const tx = await vault.connect(owner).proposeTreasury(new_treasury)
+      const block = await ethers.provider.getBlock(tx.blockNumber);
+      
+      expect(await vault.pendingTreasury()).to.equal(new_treasury)
+      expect(await vault.updateTreasuryTimestamp()).to.equal(block.timestamp+TIME_DELAY-1)
+
+    });  
+  }); 
+
 
   describe("Role based access control", function () {
     const TIME_DELAY = 3 * 24 *60 *60 +1 //3 days

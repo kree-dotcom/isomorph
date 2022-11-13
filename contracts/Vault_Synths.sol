@@ -74,7 +74,11 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     address public constant SYSTEM_STATUS = 0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916;
     */
     
-    address public  treasury;
+    //The treasury is where moUSD fees are paid, to keep this upgradable we allow changing by the admin, after a timelock period
+    address public treasury;
+    address public pendingTreasury;
+    uint256 public updateTreasuryTimestamp;
+
     IisoUSDToken isoUSD;
     ICollateralBook collateralBook;
     
@@ -91,6 +95,7 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
     event BadDebtCleared(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
+    event ChangeTreasury(address oldTreasury, address newTreasury);
 
     event SystemPaused(address indexed pausedBy);
     event SystemUnpaused(address indexed unpausedBy);
@@ -157,6 +162,22 @@ contract Vault_Synths is RoleControl(VAULT_TIME_DELAY), Pausable {
         loanOpenFee = _newOpenLoanFee;
         
         
+    }
+
+    /// @notice admin only function to queue treasury address change which must wait the timelock period before being implemented
+    function proposeTreasury(address _newTreasury) external onlyAdmin {
+        require(_newTreasury != address(0)); 
+        pendingTreasury = _newTreasury;
+        updateTreasuryTimestamp = block.timestamp + VAULT_TIME_DELAY;
+    }
+
+    /// @notice admin only function to change treasury target after timelock delay
+    function setTreasury() external onlyAdmin {
+        require(updateTreasuryTimestamp < block.timestamp); 
+        address copyOfPendingTreasury = pendingTreasury;
+        require(copyOfPendingTreasury != address(0));
+        emit ChangeTreasury(treasury, copyOfPendingTreasury); //ignoring CEI pattern here
+        treasury = copyOfPendingTreasury;
     }
 
     /**
