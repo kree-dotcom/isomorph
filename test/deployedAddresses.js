@@ -42,9 +42,11 @@ const Velo_Rewards_Distributor = "0x5d5Bea9f0Fc13d967511668a60a3369fD53F784F"
 const Velo_Router = "0x9c12939390052919aF3155f41Bf4160Fd3666A6f"
 const Velo_Doner = "0x9a69A19f189585dA168C6f125aC23Db866CAFF11"
 const sAMM_USDC_sUSD = "0xd16232ad60188B68076a235c65d692090caba155"
+const vAMM_USDC_SNX = "0x9056EB7Ca982a5Dd65A584189994e6a27318067D"
 const gauge_USDC_SUSD = "0xb03f52D2DB3e758DD49982Defd6AeEFEa9454e80"
 const vAMM_VELO_OP = "0xFFD74EF185989BFF8752c818A53a47FC45388F08"
 const OP_Token = "0x4200000000000000000000000000000000000042"
+const SNX_Token = "0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4"
 
 
 
@@ -102,7 +104,9 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             sAMM_USDC_sUSD : sAMM_USDC_sUSD,
                             gauge_USDC_SUSD : gauge_USDC_SUSD,
                             vAMM_VELO_OP : vAMM_VELO_OP,
-                            OP_Token : OP_Token }
+                            OP_Token : OP_Token,
+                            vAMM_USDC_SNX : vAMM_USDC_SNX,
+                            SNX_Token : SNX_Token }
 
 const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
                             sBTC: sBTC_kOP, Synth_Owner: Synthetix_owner_kOP,

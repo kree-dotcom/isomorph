@@ -1482,13 +1482,14 @@ describe("Integration tests: Vault Synths contract", function () {
       await expect( vault.connect(owner).setTreasury()).to.be.reverted; 
     });
     it("Should succeed if change is pending and only when timelock has passed", async function () {
+      const VAULT_TIME_DELAY = 3*24*60*60 
       old_treasury = await vault.treasury()
       new_treasury = addr2.address
       await vault.connect(owner).proposeTreasury(new_treasury)
       //check set call reverts when timelock has not passed
       await expect( vault.connect(owner).setTreasury()).to.be.reverted; 
       //skip time past timelock deadline
-      helpers.timeSkip(TIME_DELAY);
+      helpers.timeSkip(VAULT_TIME_DELAY);
       await expect( vault.connect(owner).setTreasury()).to.emit(vault, 'ChangeTreasury').withArgs(old_treasury, new_treasury)
     });       
   
@@ -1505,13 +1506,14 @@ describe("Integration tests: Vault Synths contract", function () {
       await expect( vault.connect(owner).proposeTreasury(ZERO_ADDRESS)).to.be.reverted; 
     });
     it("Should succeed if given valid conditions", async function () {
+      const VAULT_TIME_DELAY = 3*24*60*60 
       old_treasury = await vault.treasury()
       const new_treasury = addr2.address
       const tx = await vault.connect(owner).proposeTreasury(new_treasury)
       const block = await ethers.provider.getBlock(tx.blockNumber);
       
       expect(await vault.pendingTreasury()).to.equal(new_treasury)
-      expect(await vault.updateTreasuryTimestamp()).to.equal(block.timestamp+TIME_DELAY)
+      expect(await vault.updateTreasuryTimestamp()).to.equal(block.timestamp+VAULT_TIME_DELAY)
 
     });       
   
