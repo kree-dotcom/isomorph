@@ -232,17 +232,21 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
       it("Should update virtual price correctly.", async function () {
         //we call the function several times and verify the virtualPrice updates as we expect.
         const virtualPrice0 = await collateralBook.viewVirtualPriceforAsset(sETHaddress);
-        await helpers.timeSkip(180); //3 minutes
+        const updateTime0 = await collateralBook.viewLastUpdateTimeforAsset(sETHaddress);
+        await helpers.timeSkip(183); //3 minutes and 3s to check timestamps only update in multiples of 180
         await collateralBook.connect(addr2).updateVirtualPriceSlowly(sETHaddress, 1 ); 
         const virtualPrice1 = await collateralBook.viewVirtualPriceforAsset(sETHaddress);
+        const updateTime1 = await collateralBook.viewLastUpdateTimeforAsset(sETHaddress);
         const manualVPcalc = ethers.BigNumber.from(virtualPrice0).mul(threeMinInterest).div(interestBase);
         expect(virtualPrice1).to.equal(manualVPcalc);
+        expect(updateTime1).to.equal(updateTime0.add(180))
         const loopNo = 43200; //12 hours in seconds
         await helpers.timeSkip(loopNo);
         let cycles = Math.floor(loopNo/180);
         let multiplier = e18;
         await collateralBook.connect(addr2).updateVirtualPriceSlowly(sETHaddress, cycles); 
         const virtualPrice2 = await collateralBook.viewVirtualPriceforAsset(sETHaddress);
+        const updateTime2 = await collateralBook.viewLastUpdateTimeforAsset(sETHaddress);
         for (let i = 0; i < cycles; i++){
           multiplier = multiplier.mul(threeMinInterest);
           multiplier = multiplier.div(interestBase);
@@ -250,6 +254,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
         //multiplier = Math.round(multiplier);
         const manualVPcalc2 = virtualPrice1.mul(multiplier).div(e18);
         expect(virtualPrice2).to.equal(manualVPcalc2);
+        expect(updateTime2).to.equal(updateTime1.add(43200))
         //repeated calls should fail.
         await expect(collateralBook.connect(addr2).updateVirtualPriceSlowly(sETHaddress, cycles)).to.be.revertedWith("Cycle count too high");
       });
