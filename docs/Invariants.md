@@ -12,7 +12,7 @@ This file lists various properties that should always true within the Isomorph s
 
 - Repaid loans should either be burned if they relate to the loan principle or sent to the treasury if they relate to accrued interest.
 
-- If the daily total loans of a Vault is reached it should not be possible to mint any more moUSD from that Vault until a day has passed since the daily total having been reached for that Vault.
+- If the daily total loans of a Vault is reached it should not be possible to mint any more isoUSD from that Vault until a day has passed since the daily total having been reached for that Vault.
 
 - To fully clear a loan, the loan being repaid should always exceed the original borrowed sum.
 

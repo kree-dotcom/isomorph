@@ -28,7 +28,7 @@ As borrowers will wish to use their isoUSD on other DeFi protocols it will vital
 ## Tests and coverage:
 
 - Begin by cloning the repo
-- The repo contains a submodule so run `git submodule init && git submodule update` to get these files for Velo-Deposit-Tokens.
+- The repo contains a submodule so run `git submodule init && git submodule update` to get these files for Velo-Deposit-Tokens. This submodule contains its own tests and documents so please follow its own README.md for testing it.
 - Then run "yarn install" in the main directory to install all required packages
 - Connect your API endpoints and privatekey using the .env file. See sample_env for details.
 
@@ -39,7 +39,7 @@ If you swap to a different network you will need to update the static addresses 
 - Then run "yarn hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again. The first test run will likely be much slower due to needing to fetch contract information at the fork block height. We use this block height for integration testing as we know all token doners have the balances we need to borrow at this height. If the block height is changed be aware tests using Synths or Lyra systems may fail if the respective external system's circuit breaker is in effect.
 
 Coverage is currently as follows:
----------------------------------|----------|----------|----------|----------|----------------|
+
 File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
 ---------------------------------|----------|----------|----------|----------|----------------|
  contracts/                      |    97.75 |    87.31 |    95.19 |    97.25 |                |
@@ -54,7 +54,7 @@ File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Un
   isoUSDToken.sol                |      100 |      100 |      100 |      100 |                |
 ---------------------------------|----------|----------|----------|----------|----------------|
 All files                        |    97.75 |    87.31 |    95.19 |    97.25 |                |
----------------------------------|----------|----------|----------|----------|----------------|
+
 
 Please note ConfirmedOwnerWithProposal.sol was written by Chainlink and so can be ignored.
 

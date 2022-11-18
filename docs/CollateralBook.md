@@ -40,7 +40,7 @@ and so should prevent pausing of the wrong collateral
 This function enables an Admin to unpause a previously paused collateral. In doing so the `collateralPaused` mapping of it's address is set to `False` and it's collateralValid mapping is set to `True`. We require the currencyKey to be provided alongside the collateralAddress as this is easier to spot errors in and so should prevent pausing of the wrong collateral.
  
 - addVaultAddress
-We assign a new vault to an assetType by calling this function, the new Vault is also assigned the Vault role which allows it to mint new moUSD. This function is only callable by the Admin
+We assign a new vault to an assetType by calling this function, the new Vault is also assigned the Vault role which allows it to mint new isoUSD. This function is only callable by the Admin
 
 - _updateVirtualPriceAndTime
 This internal function is used whenever a `virtualPrice` and `lastUpdateTime` of a collateral is being updated. It contains sanity checks that the updated values are strictly larger than the existing values. The `virtualPrice` and `lastUpdateTime` should never decrease.
