@@ -370,7 +370,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       
     });
 
-    it("Should allow adding multiple NFTs to the same loan", async function (){
+    it("Should allow adding multiple NFTs to the same loan but revert when limit is reached", async function (){
       const amount2 = ethers.utils.parseEther('4');
       const NFTId = 1;
       const NFTId2 = 2;
@@ -432,8 +432,62 @@ describe("Unit tests: Vault_Velo contract", function () {
       }
       expect(loanIds.indexOf(NFTId)).to.equal(0);
       expect(loanIds.indexOf(NFTId2)).to.equal(1);
+
      
     })
+
+    it("Should revert if all collateral slots are full", async function () {
+      let newNFTIds = []
+      const amount = ethers.utils.parseEther('4');
+      for( let i = 0; i < maxNoOfCollaterals; i++){
+        await depositReceipt.connect(alice).UNSAFEMint(amount)
+        newNFTIds.push(1+i)
+        await depositReceipt.connect(alice).approve(vault.address, 1+i)
+        await vault.connect(alice).openLoan(depositReceipt.address, 1+i, 1, true)
+      
+      }
+      //load in stored NFTIds for this loan
+      let loanIds = []
+      for(let i =0; i < maxNoOfCollaterals; i++ ){
+        loanIds.push((await vault.getLoanNFTids(alice.address, depositReceipt.address, i)).toNumber());
+      }
+      //verify they match the NFTs deposited.
+      for (let i = 0; i < maxNoOfCollaterals -1 ; i++){
+        await expect(loanIds.indexOf(newNFTIds[i])).to.equal(i);
+
+      }
+      
+      //try to add more collateral NFTs than allowed.
+      await depositReceipt.connect(alice).UNSAFEMint(amount)
+      rejectedNFTId = 1 + maxNoOfCollaterals
+      await depositReceipt.connect(alice).approve(vault.address, rejectedNFTId)
+      await expect(vault.connect(alice).openLoan(depositReceipt.address, rejectedNFTId, 1, true)).to.be.revertedWith("All NFT slots for loan used");
+      
+      
+    });
+
+    it("Should not add new collateral NFT details if addingCollateral is false", async function () {
+      const NFTId = 1;
+      let loanTaken = 1
+      //approve transfer of depositReceipt NFT and call openLoan
+      await depositReceipt.connect(alice).approve(vault.address, NFTId)
+      await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
+
+
+      let notAddingCollateral = false
+      let newNFTId = 2
+      vault.connect(alice).openLoan(depositReceipt.address, newNFTId, loanTaken, notAddingCollateral)
+
+      expect( await vault.getLoanNFTids(alice.address, depositReceipt.address, 0)).to.equal(1)
+
+      for(let i =1; i < maxNoOfCollaterals; i++ ){
+        expect( await vault.getLoanNFTids(alice.address, depositReceipt.address, i)).to.equal(0)
+      }
+      
+      
+    });
+
+
 
     it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
       const loanTaken = 500000 
@@ -1479,6 +1533,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       
     });
 
+    
+
     it("Should partially liquidate loan if possible and emit Liquidation event", async function () {
       //here the liquidator and loan holders swap roles as alice loan is impossible to 
       //partially liquidate as collat value ~= loan.
@@ -1801,6 +1857,29 @@ describe("Unit tests: Vault_Velo contract", function () {
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
       await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
+    });       
+  
+    
+  });
+
+  describe("setOpenLoanFee", function () {
+    beforeEach(async function () {
+       
+    });
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(bob).setOpenLoanFee(12)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should succeed when called by owner with values smaller than 10**17 (10%)", async function () {
+      const newMax = ethers.utils.parseEther("0.01");
+      const oldMax = await vault.dailyMax();
+      expect( await vault.connect(owner).setOpenLoanFee(newMax)).to.emit(vault, 'changeOpenLoanFee').withArgs(newMax, oldMax); 
+      expect(await vault.loanOpenFee()).to.equal(newMax)
+      expect( await vault.connect(owner).setOpenLoanFee(0)).to.emit(vault, 'changeOpenLoanFee').withArgs(0, newMax);
+      expect(await vault.loanOpenFee()).to.equal(0)
+    });
+    it("Should fail with values larger than 10**17 (10%)", async function () {
+      const wrongMax = ethers.utils.parseEther("0.11");
+      await expect(vault.connect(owner).setOpenLoanFee(wrongMax)).to.be.reverted; 
     });       
   
     

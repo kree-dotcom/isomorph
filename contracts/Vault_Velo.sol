@@ -434,17 +434,19 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         isoUSDLoaned[_collateralAddress][msg.sender] = isoUSDLoaned[_collateralAddress][msg.sender] + _USDborrowed;
         isoUSDLoanAndInterest[_collateralAddress][msg.sender] = isoUSDLoanAndInterest[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);
         NFTids storage userNFTs = loanNFTids[_collateralAddress][msg.sender];
-        for(uint256 i =0; i < NFT_LIMIT; i++){
-            //if this id slot isn't already full assign it
-            if (userNFTs.ids[i] == 0){
-                userNFTs.ids[i] = _NFTId;
-                //then break so only one slot is assigned this id
-                break;
-            }
-            else{
-                if(i == NFT_LIMIT -1){
-                    //we have reached the final position and there are no free slots
-                    revert("All NFT slots for loan used");
+        if(_addingCollateral){
+            for(uint256 i =0; i < NFT_LIMIT; i++){
+                //if this id slot isn't already full assign it
+                if (userNFTs.ids[i] == 0){
+                    userNFTs.ids[i] = _NFTId;
+                    //then break so only one slot is assigned this id
+                    break;
+                }
+                else{
+                    if(i == NFT_LIMIT -1){
+                        //we have reached the final position and there are no free slots
+                        revert("All NFT slots for loan used");
+                    }
                 }
             }
         }
@@ -459,6 +461,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
       * @param _collateralAddress address of collateral token being used.
       * @param _NFTId the NFT id which maps the NFT to it's characteristics
      **/
+    
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _NFTId
@@ -510,6 +513,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         _increaseCollateral(depositReceipt, _NFTId);
         
     }
+
 
 
      /**

@@ -40,6 +40,7 @@ describe("Integration tests: Vault_Velo contract", function () {
   let loanOpenfee = ethers.utils.parseEther('0.01'); //1%
   let liquidatorFee = ethers.utils.parseEther('0.05'); //5%
   
+  
   const testCode = ethers.utils.formatBytes32String("test");
   const sUSDCode = ethers.utils.formatBytes32String("sUSD");
   const NFTCode = ethers.utils.formatBytes32String("sAMM-USDC-sUSD"); //name format volatile/stable AMM-token0-token1
@@ -91,7 +92,6 @@ describe("Integration tests: Vault_Velo contract", function () {
         
         //fetch relevant contracts
         DepositReceipt = await ethers.getContractFactory("TESTDepositReceipt")
-        //Router = await ethers.getContractFactory("TESTRouter")
         vaultContract = await ethers.getContractFactory("Vault_Velo")
         isoUSDcontract = await ethers.getContractFactory("isoUSDToken");
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
@@ -1385,6 +1385,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       const pooledTokens = await depositReceipt.pooledTokens(NFTId)
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const loanTaken = collateralUsed.mul(999).div(1000)
+      
       await depositReceipt.connect(alice).approve(vault.address, NFTId)
       await expect(vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, true)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, loanTaken, NFTCode,collateralUsed );
       //then we make another loan with a different user who will be the liquidator and so needs isoUSD
@@ -1456,6 +1457,83 @@ describe("Integration tests: Vault_Velo contract", function () {
       expect(call).to.emit(vault, 'BadDebtClearedNFT').withArgs(alice.address, bob.address, badDebtQuantity, NFTCode);
       
     });
+
+    it("Should liquidate correctly for outstanding loan interest when loan principle has already been fully repaid", async function(){
+      
+      const beforeLoanisoUSD = await isoUSD.balanceOf(bob.address);
+      
+      //set nearly 1:1 collateral to loan requirements to make situation set up easier again 
+      const depositReceiptMinMargin2 = ethers.utils.parseEther("1.001")
+      const depositReceiptLiqMargin2 = ethers.utils.parseEther("1.0");
+      // set interest incredibly high so we can reach the required interest on loan without Chainlink giving us a stale price feed
+      const depositReceiptInterest2 = ethers.utils.parseEther("1.1"); 
+      await collateralBook.TESTchangeCollateralType(depositReceipt.address, NFTCode, depositReceiptMinMargin2, depositReceiptLiqMargin2, depositReceiptInterest2,  ZERO_ADDRESS, liq_return.mul(2), VELO);   //fake LIQ_RETURN used for ease of tests   
+
+      //timeskip to accrue interest on loan 
+      const depositReceiptInterest2Decimal = 110000000
+      await cycleVirtualPrice(180, depositReceipt); //i.e. update virtualPrice once with a very large (10%) interest growth.
+
+      let principleRepaid = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
+      await isoUSD.connect(bob).transfer(alice.address, principleRepaid)
+      //after repaying principle, we should have roughly 10% left as loan interest so we withdraw 89% of collateral to bring loan close to liquidatable again.
+      let collateralWithdrawn = base.mul(89).div(100)
+
+      //repay loan principle leaving behind interest
+      await isoUSD.connect(alice).approve(vault.address, principleRepaid)
+      console.log("repaying principel of ", principleRepaid)
+      let NFTId = 1
+      let total = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+      let virtualP = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      console.log("total owed ", total.mul(virtualP).div(base))
+      let collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED, NOT_OWNED,NOT_OWNED,NOT_OWNED, NOT_OWNED,NOT_OWNED, 0]];
+      await vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, principleRepaid, collateralWithdrawn);
+      
+      //check principle has been fully repaid but interest has not
+      expect( await vault.isoUSDLoaned(depositReceipt.address, alice.address)).to.equal(0)
+      let interestRemaining = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+      expect(interestRemaining).to.be.greaterThan(0)
+      let virtualPrice1 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+
+      //modify minimum and liquidation collateral ratios to enable liquidation
+      const depositReceiptMinMargin4 = ethers.utils.parseEther("8.0");
+      const depositReceiptLiqMargin4 = ethers.utils.parseEther("7.0");
+      const depositReceiptInterest4 = ethers.utils.parseEther("1.00000180"); // roughly 37% APR
+      await collateralBook.TESTchangeCollateralType(depositReceipt.address, NFTCode, depositReceiptMinMargin4, depositReceiptLiqMargin4, depositReceiptInterest4, ZERO_ADDRESS, liq_return, VELO);      
+      
+      const pooledTokens = await depositReceipt.pooledTokens(NFTId)
+      const leftoverCollateral = await depositReceipt.priceLiquidity(pooledTokens)
+      
+
+      //isoUSD repayment approval and liquidation call
+      let liquidatorBalance = await isoUSD.balanceOf(bob.address)
+      await isoUSD.connect(bob).approve(vault.address, liquidatorBalance)
+      collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED,NOT_OWNED, NOT_OWNED,NOT_OWNED,NOT_OWNED, NOT_OWNED,0]];
+      let partialPercentage = ethers.utils.parseEther("0.90"); //99%
+      const tx = await vault.connect(bob).callLiquidation(alice.address, depositReceipt.address, collateralNFTs, partialPercentage)
+      
+      //check liquidation event args
+      const virtualPriceEnd = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      const realLoanOwed = interestRemaining.mul(virtualPriceEnd).div(e18);
+      //ethPriceBN = await vault.priceCollateralToUSD(NFTCode, e18);
+      const liquidateCollateral = leftoverCollateral.mul(partialPercentage).div(base)
+      const liquidatorPayback = (liquidateCollateral).mul(base.sub(liquidatorFee)).div(base); 
+      
+      await expect (tx).to.emit(vault, 'LiquidationNFT').withArgs(alice.address, bob.address, liquidatorPayback, NFTCode, liquidateCollateral);  
+      
+      //determine how much isoUSD the liquidator paid
+      let liquidatorPaid = liquidatorBalance.sub(await isoUSD.balanceOf(bob.address))
+      //check this matches the written off interest
+      let unpaidInterest = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+      
+      let virtualPrice2 = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      let paidInterest = (interestRemaining.mul(virtualPrice1).div(base)).sub(unpaidInterest.mul(virtualPrice2).div(base))
+
+      expect(liquidatorPaid).to.be.closeTo(paidInterest, 1) //rounding error adjustment
+
+      //check principle owed is still zero
+      expect( await vault.isoUSDLoaned(depositReceipt.address, alice.address)).to.equal(0)
+      
+    })
 
     it("Should partially liquidate loan if possible and emit Liquidation event", async function () {
       //here the liquidator and loan holders swap roles as alice loan is impossible to 
