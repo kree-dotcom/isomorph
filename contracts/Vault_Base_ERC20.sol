@@ -25,8 +25,10 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     //collateral address => user address => quantity
     mapping(address => mapping(address => uint256)) public collateralPosted;
     //this stores the original loan principle requested, used for burning when closing
+    //collateral address => user address => loan principle quantity
     mapping(address => mapping(address => uint256)) public isoUSDLoaned;
     //this records loan amounts requested and grows by interest accrued
+    //collateral address => user address => total loan and interest owed
     mapping(address => mapping(address => uint256)) public isoUSDLoanAndInterest;
 
     //variables relating to access control and setting new roles

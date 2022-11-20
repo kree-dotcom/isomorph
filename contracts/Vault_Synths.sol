@@ -10,11 +10,6 @@ import "./helper/interfaces/ISynthetix.sol";
 import "./helper/interfaces/IExchangeRates.sol";
 import "./helper/interfaces/ISystemStatus.sol";
 
-//dev debug
-import "hardhat/console.sol";
-
-
-
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
@@ -31,15 +26,6 @@ contract Vault_Synths is Vault_Base_ERC20 {
     address public constant PROXY_ERC20 = 0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4;
     address public constant SUSD_ADDR = 0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9;
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
-    
-    //Optimism Goerli addresses
-    /*
-    address public constant EXCHANGE_RATES = 0x280E5dFaA78CE685a846830bAe5F2FD21d6A3D89;
-    address public constant PROXY_ERC20 = 0x2E5ED97596a8368EB9E44B1f3F25B2E813845303;
-    address public constant SUSD_ADDR = 0xeBaEAAD9236615542844adC5c149F86C36aD1136;
-    address public constant SYSTEM_STATUS = 0x9D89fF8C6f3CC22F4BbB859D0F85FB3a4e1FA916;
-    */
-    
     
     IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
     ISystemStatus private synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);

@@ -8,9 +8,6 @@ pragma abicoder v2;
 // External Lyra interface
 import "./helper/interfaces/ILiquidityPoolAvalon.sol";
 
-//dev debug
-import "hardhat/console.sol";
-
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 

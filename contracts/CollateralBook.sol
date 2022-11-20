@@ -2,7 +2,6 @@
 pragma solidity =0.8.9;
 pragma abicoder v2;
 import "./RoleControl.sol";
-import "hardhat/console.sol";
 import "./interfaces/ICollateralBook.sol";
 import "./interfaces/IVault.sol";
 
@@ -263,7 +262,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
             Collateral memory collateral = collateralProps[_collateralAddress];
             uint256 timeDelta = block.timestamp - collateral.lastUpdateTime;
             uint256 threeMinDelta = timeDelta / THREE_MIN;
-            //console.log("CBtimeD ", timeDelta, " CBtMD ", threeMinDelta);
+    
             require(_cycles <= threeMinDelta, 'Cycle count too high');
                 for (uint256 i = 0; i < _cycles; i++ ){
                     collateral.virtualPrice = (collateral.virtualPrice * collateral.interestPer3Min) / DIVISION_BASE; 

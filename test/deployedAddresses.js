@@ -113,8 +113,13 @@ const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
                             System: system_kOP, sUSD_Doner: sUSDDoner_kOP,
                             sETH_Doner: SETHDoner_kOP, Exchange_Rates: Exchange_Rates_kOP,
                             System_Status: System_Status_kOP, Proxy_ERC20: Proxy_ERC20_kOP }
+                            
+                            
+const optimism_Goerli = {sUSD: sUSD_gOP, sETH: sETH_gOP, sBTC: sBTC_gOP}
+                            
+                            
 
-addresses = {mainnet: mainnet_ETH, optimism: optimism_OP, optimism_Kovan : optimism_Kovan}
+addresses = {mainnet: mainnet_ETH, optimism: optimism_OP, optimism_Kovan : optimism_Kovan, optimism_Goerli : optimism_Goerli}
 
 module.exports = { addresses }
 

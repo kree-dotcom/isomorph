@@ -7,24 +7,18 @@ pragma abicoder v2;
 
 import "./interfaces/IisoUSDToken.sol";
 import "./interfaces/IVault.sol";
-import "hardhat/console.sol";
-
 import "./interfaces/ICollateralBook.sol";
 import "./interfaces/IDepositReceipt.sol";
 
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+
 import "./RoleControl.sol";
 
 uint256 constant VAULT_VELO_TIME_DELAY = 3 days;
 
 
 contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
-
-    using SafeERC20 for IERC20;
 
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
@@ -105,14 +99,14 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function _validMarketConditions(address _collateralAddress, address _loanHolder) internal view{
         _collateralExists(_collateralAddress);
         require(_loanHolder != address(0), "Zero address used"); 
-        //_;
+        
     }
     
     /// @notice stripped down version of validMarketConditions used when checks of loanHolder aren't necessary
     /// @dev should be called by any external function modifying the msg.sender's loan
     function _collateralExists(address _collateralAddress) internal view {
         require(collateralBook.collateralValid(_collateralAddress), "Unsupported collateral!");
-        //_;
+        
     }
 
     modifier onlyPauser{
@@ -126,7 +120,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         address _treasury, //treasury address
         address _collateralBook //collateral structure book address
         ){
-        //cd ("CURRENT BLOCK NUMBER", block.number);
+        
         require(_isoUSD != address(0), "Zero Address used isoUSD");
         require(_treasury != address(0), "Zero Address used Treasury");
         require(_collateralBook != address(0), "Zero Address used Collateral");
@@ -143,7 +137,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
      */
 
 
-    /// @notice sets state to paused only triggerable by pauser (all admins are pausers also)
+    /// @notice sets state to paused only triggerable by pauser (all admins can call Pauser functions also)
     function pause() external onlyPauser {
         _pause();
         emit SystemPaused(msg.sender);
@@ -313,7 +307,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) internal {
         //only process isoUSD if it's non-zero.
         if (_USDReturned != 0){
-            //_interestPaid is always less thn _USDReturned so this is safe.
+            //_interestPaid is always less than _USDReturned so this is safe.
             uint256 USDBurning = _USDReturned - _interestPaid;
             //slither-disable-next-line unchecked-transfer
             isoUSD.transferFrom(msg.sender, address(this), _USDReturned);

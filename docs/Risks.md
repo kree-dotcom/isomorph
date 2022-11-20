@@ -10,6 +10,7 @@ The smart contracts themselves assume isoUSD always has a value of $1 and so whe
 - Multi-sig risks. Governance is decided currently by a multi-sig this is a 3 of 4 model and so is resistent to  up to 2 members of the multisig being compromised but a coordinated attack could lead to a governance attack. 
 However important governance actions are delayed by a timelock of 3 days and so even if this were to  occur the community will have some time to react. 
 
+- `setOpenLoanFee` could be abused by a malicious Admin address to front-run loan opening and charge a higher loan opening fee than intended. We have set a maximum loan open fee of 10% to mitigate the potential of this risk and the admin address will be a multi-sig to reduce the likelihood of malicious use. We would use a timelock for changing the loanOpenFee but due to the code size of some Vaults this is not possible.
 
 
 

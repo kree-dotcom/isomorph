@@ -19,7 +19,7 @@ When assets are deposited the user will be able to mint isoUSD at varying ratios
 
 At launch Isomorph will support several Synthetix synths, Lyra Option Pool tokens on Optimism and some Velodrome liquidity tokens with plans to expand these ranges of novel assets as well as including other protocols.
 
- By using isoUSD loans liquidity providers will be able to leverage their exposure to pools and so compound their returns, gaining better returns on their employed capital. Alternative they can use the loan for tax management (dependent on location) and daily costs while letting the underlying collateral appreciate. This general strategy shall be repeated for other platforms enabling sustainable returns to be generated for the Isomorph system. 
+ By using isoUSD loans liquidity providers will be able to leverage their exposure to pools and so compound their returns, gaining better returns on their employed capital. Alternatively they can use the loan for tax management (dependent on location) and daily costs while letting the underlying collateral appreciate. This general strategy shall be repeated for other platforms enabling sustainable returns to be generated for the Isomorph system. 
 
 ## Stability of isoUSD:
 
@@ -42,7 +42,7 @@ Coverage is currently as follows:
 
 File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
 ---------------------------------|----------|----------|----------|----------|----------------|
- contracts/                      |    97.75 |    87.31 |    95.19 |    97.25 |                |
+ contracts/                      |    98.37 |    88.92 |    96.15 |    98.23 |                |
   CollateralBook.sol             |      100 |    82.89 |      100 |      100 |                |
   ConfirmedOwnerWithProposal.sol |    33.33 |    33.33 |    42.86 |    35.29 |... 54,61,63,65 |
   Locker.sol                     |      100 |      100 |      100 |      100 |                |
@@ -50,10 +50,11 @@ File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Un
   Vault_Base_ERC20.sol           |      100 |    93.18 |      100 |      100 |                |
   Vault_Lyra.sol                 |      100 |    89.58 |      100 |      100 |                |
   Vault_Synths.sol               |      100 |     91.3 |      100 |      100 |                |
-  Vault_Velo.sol                 |     98.2 |    88.33 |    96.67 |    97.13 |... 447,668,670 |
+  Vault_Velo.sol                 |      100 |    93.44 |      100 |      100 |                |
   isoUSDToken.sol                |      100 |      100 |      100 |      100 |                |
 ---------------------------------|----------|----------|----------|----------|----------------|
-All files                        |    97.75 |    87.31 |    95.19 |    97.25 |                |
+All files                        |    98.37 |    88.92 |    96.15 |    98.23 |                |
+---------------------------------|----------|----------|----------|----------|----------------|
 
 
 Please note ConfirmedOwnerWithProposal.sol was written by Chainlink and so can be ignored.
@@ -62,7 +63,7 @@ Please note ConfirmedOwnerWithProposal.sol was written by Chainlink and so can b
 
 # Slither results
 Running slither . --filter-paths "contracts/tests|node_modules|contracts/Migrations|contracts/helper|contracts/interfaces|contracts/ConfirmedOwnerWithProposal"
-produces 218 results. The above paths were filtered due to either not being written by us or being irrelevant. 
+produces 206 results. The above paths were filtered due to either not being written by us or being irrelevant. 
 
 
 
