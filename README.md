@@ -54,7 +54,7 @@ File                             |  % Stmts | % Branch |  % Funcs |  % Lines |Un
   isoUSDToken.sol                |      100 |      100 |      100 |      100 |                |
 ---------------------------------|----------|----------|----------|----------|----------------|
 All files                        |    98.37 |    88.92 |    96.15 |    98.23 |                |
----------------------------------|----------|----------|----------|----------|----------------|
+
 
 
 Please note ConfirmedOwnerWithProposal.sol was written by Chainlink and so can be ignored.
