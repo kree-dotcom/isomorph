@@ -47,6 +47,7 @@ const gauge_USDC_SUSD = "0xb03f52D2DB3e758DD49982Defd6AeEFEa9454e80"
 const vAMM_VELO_OP = "0xFFD74EF185989BFF8752c818A53a47FC45388F08"
 const OP_Token = "0x4200000000000000000000000000000000000042"
 const SNX_Token = "0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4"
+const sAMM_USDC_sUSD_Doner = "0xb03f52d2db3e758dd49982defd6aeefea9454e80"
 
 
 
@@ -106,7 +107,8 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             vAMM_VELO_OP : vAMM_VELO_OP,
                             OP_Token : OP_Token,
                             vAMM_USDC_SNX : vAMM_USDC_SNX,
-                            SNX_Token : SNX_Token }
+                            SNX_Token : SNX_Token,
+                            sAMM_USDC_sUSD_Doner : sAMM_USDC_sUSD_Doner }
 
 const optimism_Kovan = {sUSD: sUSD_kOP, sETH: sETH_kOP, sBTC: sBTC_kOP,
                             sBTC: sBTC_kOP, Synth_Owner: Synthetix_owner_kOP,

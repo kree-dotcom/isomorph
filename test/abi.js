@@ -70,6 +70,18 @@ const ERC20 = [
     "function getPriorBalanceIndex(uint, uint) external view returns (uint)",
     "function lastEarn(address, uint) external view returns (uint)"
   ]
+  
+  const Depositor = [
+     "function depositToGauge(uint256) external returns(uint256)"
+  ]
+  
+  const Gauge = [
+  	"function deposit(uint256, uint256) external"
+  ]
+  
+  const ERC721 = [
+  	"function approve(address, uint256) external"
+  ]
 
   
 
@@ -83,7 +95,10 @@ const ERC20 = [
           PriceFeed : PriceFeed,
           Voter : Voter,
           Voting_Escrow : Voting_Escrow,
-          External_Bribe : External_Bribe
+          External_Bribe : External_Bribe,
+          Depositor : Depositor,
+          Gauge : Gauge,
+          ERC721 : ERC721
           }
   module.exports = { ABIs }
 
