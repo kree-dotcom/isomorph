@@ -28,6 +28,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     //users can only hold 8 NFTS relating to a loan so returning 999 is clearly out of bounds, not owned. 888 is no NFT to return, also out of bounds.
     uint256 private constant NFT_LIMIT = 8; //the number of slots available on each loan for storing NFTs, used as loop bound. 
     uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
+    uint256 private constant THREE_MIN = 180;
 
     //structure to store up to 8 NFTids for each loan, if more are required use a different address.
     //could be packed more efficiently probably but we're on optimism so not as important.
@@ -260,7 +261,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             for (uint256 i = 0; i < threeMinuteDelta; i++ ){
             virtualPrice = (virtualPrice * interestPer3Min) / LOAN_SCALE; 
             }
-            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, _currentBlockTime);
+            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, lastUpdateTime + threeMinuteDelta*THREE_MIN);
         }
     }
     

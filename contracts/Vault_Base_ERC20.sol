@@ -38,6 +38,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
     uint256 public constant LOAN_SCALE = 1 ether; //base for division/decimal maths
     uint256 public constant TENTH_OF_CENT = 1 ether /1000; //$0.001
+    uint256 private constant THREE_MIN = 180;
 
     //Enums// collateral type identifiers to revert if the wrong collateral is interacted with by the wrong Vault.
     enum AssetType {Synthetix_Synth, Lyra_LP} 
@@ -211,12 +212,12 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         ) = _getCollateral(_collateralAddress);
         uint256 timeDelta = _currentBlockTime - lastUpdateTime;
         //exit gracefully if two users call the function for the same collateral in the same 3min period
-        uint256 threeMinuteDelta = timeDelta / 180; 
+        uint256 threeMinuteDelta = timeDelta / THREE_MIN; 
         if(threeMinuteDelta > 0) {
             for (uint256 i = 0; i < threeMinuteDelta; i++ ){
             virtualPrice = (virtualPrice * interestPer3Min) / LOAN_SCALE; 
             }
-            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, _currentBlockTime);
+            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, lastUpdateTime + threeMinuteDelta*THREE_MIN);
         }
     }
     
