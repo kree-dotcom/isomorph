@@ -117,7 +117,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
 
         //make sure the total isoUSD borrowed doesn't exceed the opening borrow margin ratio
         uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender]);
-        uint256 totalUSDborrowed = _USDborrowed +  (isoUSDLoaned[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
+        uint256 totalUSDborrowed = _USDborrowed +  (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
         require(totalUSDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); 
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
