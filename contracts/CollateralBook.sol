@@ -20,7 +20,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
 
     uint256 public constant THREE_MIN = 180;
     uint256 public constant DIVISION_BASE = 1 ether;
-    uint256 public constant CHANGE_COLLATERAL_DELAY = 200; //2 days
+    uint256 public constant CHANGE_COLLATERAL_DELAY = 2 days
 
     //temporary data stores for changing Collateral variables
     address queuedCollateralAddress;
