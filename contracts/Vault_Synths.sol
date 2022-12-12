@@ -23,8 +23,6 @@ contract Vault_Synths is Vault_Base_ERC20 {
     //Optimism Mainnet addresses
     
     address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
-    address public constant PROXY_ERC20 = 0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4;
-    address public constant SUSD_ADDR = 0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9;
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
     
     IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
