@@ -49,6 +49,8 @@ contract RoleControl is AccessControl{
         require(previous_action_hash == action_hash, "Invalid Hash");
         require(block.timestamp > action_queued[action_hash] + TIME_DELAY,
             "Not enough time has passed");
+        //overwrite old hash to prevent reuse.
+        delete previous_action_hash;
         //use a hash to verify proposed account is the same as added account.
         _setupRole(_role, _account);
         emit AddRole(_account, _role,  msg.sender);
