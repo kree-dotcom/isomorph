@@ -27,7 +27,6 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
 
     //users can only hold 8 NFTS relating to a loan so returning 999 is clearly out of bounds, not owned. 888 is no NFT to return, also out of bounds.
     uint256 private constant NFT_LIMIT = 8; //the number of slots available on each loan for storing NFTs, used as loop bound. 
-    uint256 private constant TENTH_OF_CENT = 1 ether /1000; //$0.001
     uint256 private constant THREE_MIN = 180;
 
     //structure to store up to 8 NFTids for each loan, if more are required use a different address.
@@ -546,10 +545,12 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         
         
         uint256 isoUSDdebt = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        require( isoUSDdebt >= _USDToVault, "Trying to return more isoUSD than borrowed!");
+        if(isoUSDdebt < _USDToVault){
+            _USDToVault = isoUSDdebt;
+        }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
         uint256 colInUSD = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
-        if(outstandingisoUSD >= TENTH_OF_CENT){ //ignore debts less than $0.001
+        if(outstandingisoUSD > 0){ //check for leftover debt
             uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
             require(collateralLeft > borrowMargin , "Remaining debt fails to meet minimum margin!");

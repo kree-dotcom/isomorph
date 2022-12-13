@@ -37,7 +37,6 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
     uint256 public constant LOAN_SCALE = 1 ether; //base for division/decimal maths
-    uint256 public constant TENTH_OF_CENT = 1 ether /1000; //$0.001
     uint256 private constant THREE_MIN = 180;
 
     //Enums// collateral type identifiers to revert if the wrong collateral is interacted with by the wrong Vault.

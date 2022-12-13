@@ -208,9 +208,11 @@ contract Vault_Synths is Vault_Base_ERC20 {
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey);
         uint256 isoUSDdebt = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        require( isoUSDdebt >= _USDToVault, "Trying to return more isoUSD than borrowed!");
+        if(isoUSDdebt < _USDToVault){
+            _USDToVault = isoUSDdebt;
+        }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
-        if(outstandingisoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
+        if(outstandingisoUSD > 0){ //check for leftover debt
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
             uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
