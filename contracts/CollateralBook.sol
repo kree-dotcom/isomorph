@@ -108,6 +108,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1 otherwise it could decrease
         require(vaults[_assetType] != address(0), "Vault not deployed yet");
         IVault vault = IVault(vaults[_assetType]);
+        require(liquidityPoolOf[_currencyKey] == address(0), "CurrencyKey already in use");
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
         require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low");
 
@@ -303,6 +304,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(_liquidationRatio > 0);
         require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1 otherwise it could decrease
         require(vaults[_assetType] != address(0), "Vault not deployed yet");
+        require(liquidityPoolOf[_currencyKey] == address(0), "CurrencyKey already in use");
         IVault vault = IVault(vaults[_assetType]);
 
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
