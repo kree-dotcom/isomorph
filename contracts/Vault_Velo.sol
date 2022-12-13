@@ -553,7 +553,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         if(outstandingisoUSD > 0){ //check for leftover debt
             uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
-            require(collateralLeft > borrowMargin , "Remaining debt fails to meet minimum margin!");
+            require(collateralLeft >= borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
 
         //record paying off loan principle before interest

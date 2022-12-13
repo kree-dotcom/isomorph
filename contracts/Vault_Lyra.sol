@@ -226,7 +226,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
             uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
-            require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
+            require(colInUSD >= borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
 
         //record paying off loan principle before interest
