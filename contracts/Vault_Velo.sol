@@ -483,11 +483,6 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             ,
             uint256 virtualPrice
         ) = _getCollateral(_collateralAddress);
-        //We check adding the collateral brings the user above the liquidation point to avoid instantly being liquidated, poor UX 
-        uint256 USDborrowed = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
-        require(existingCollateral + addedValue >= borrowMargin, "Liquidation margin not met!");
-    
         //update mapping with new collateral amount 
         emit IncreaseCollateralNFT(msg.sender, currencyKey, addedValue);
         NFTids storage userNFTs = loanNFTids[_collateralAddress][msg.sender];

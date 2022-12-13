@@ -166,13 +166,6 @@ contract Vault_Synths is Vault_Base_ERC20 {
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey);
-        //debatable check begins here 
-        uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat);
-        uint256 USDborrowed = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
-        require(colInUSD >= borrowMargin, "Liquidation margin not met!");
-        //debatable check ends here
         //update mapping with new collateral amount
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
         emit IncreaseCollateral(msg.sender, currencyKey, _colAmount);
