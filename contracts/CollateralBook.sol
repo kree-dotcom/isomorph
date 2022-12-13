@@ -113,7 +113,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(vaults[_assetType] != address(0), "Vault not deployed yet");
         IVault vault = IVault(vaults[_assetType]);
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
-        require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low");
+        require( vault.LIQUIDATION_RETURN() *_liquidationRatio > 10 ** 36, "Liquidation ratio too low");
 
         queuedCollateralAddress = _collateralAddress;
         queuedCurrencyKey = _currencyKey;
@@ -311,7 +311,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         IVault vault = IVault(vaults[_assetType]);
 
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
-        require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
+        require( vault.LIQUIDATION_RETURN() *_liquidationRatio > 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
         collateralValid[_collateralAddress] = true;
         collateralProps[_collateralAddress] = Collateral(
             _currencyKey,
