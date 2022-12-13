@@ -287,7 +287,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     /// @param _depositReceipt the ERC721 compatible collateral to use, already set up in another function
     /// @param _NFTid the unique idenfifier for this specific NFT, ownership already verified 
     function _increaseCollateral(IDepositReceipt _depositReceipt, uint256 _NFTid) internal {
-        _depositReceipt.safeTransferFrom(msg.sender, address(this), _NFTid);
+        _depositReceipt.transferFrom(msg.sender, address(this), _NFTid);
     }
 
     
@@ -636,11 +636,11 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
                     //split the NFT based on the partialPercentage proposed
                     uint256 newId = depositReceipt.split(_loanNFTs.ids[i], _partialPercentage);
                     //send the new NFT to the user, no mapping to update as original id NFT remains with the vault.
-                    depositReceipt.safeTransferFrom(address(this), msg.sender, newId);
+                    depositReceipt.transferFrom(address(this), msg.sender, newId);
                     }
                 else{
                     userNFTs.ids[_loanNFTs.slots[i]] = 0;
-                    depositReceipt.safeTransferFrom(address(this), msg.sender, _loanNFTs.ids[i]);
+                    depositReceipt.transferFrom(address(this), msg.sender, _loanNFTs.ids[i]);
                 } 
             }
         }
