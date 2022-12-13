@@ -593,26 +593,21 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         uint256 _partialPercentage
         ) internal view returns(uint256){
         //slither-disable-next-line uninitialized-local-variables
-        uint256 proposedLiquidationAmount;
+        uint256 totalPooledTokens;
         require(_partialPercentage <= LOAN_SCALE, "partialPercentage greater than 100%");
         for(uint256 i = 0; i < NFT_LIMIT; i++){
                 if(_loanNFTs.slots[i] < NFT_LIMIT){
                     if((i == NFT_LIMIT -1) && (_partialPercentage > 0) && (_partialPercentage < LOAN_SCALE) ){
                         //final slot is NFT that will be split if necessary
-                        proposedLiquidationAmount += 
-                                                    (( _priceCollateral(IDepositReceipt(_collateralAddress), _loanNFTs.ids[i]) 
-                                                    *_partialPercentage)/ LOAN_SCALE);
-                        
+                        totalPooledTokens += ((depositReceipt.pooledTokens(userNFTs.ids[i]) * _partialPercentage) / LOAN_SCALE);
                     } 
                     else{
-                        
-                        proposedLiquidationAmount += _priceCollateral(IDepositReceipt(_collateralAddress), _loanNFTs.ids[i]);
+                        totalPooledTokens += depositReceipt.pooledTokens(userNFTs.ids[i]);
                     }
                 }
                 
             }
-            
-            return proposedLiquidationAmount;
+            return(depositReceipt.priceLiquidity(totalPooledTokens));
     }
 
     function _returnAndSplitNFTs(
