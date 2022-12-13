@@ -101,7 +101,11 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _assetType,
         address _liquidityPool
 
-    ) external collateralExists(_collateralAddress) onlyAdmin {
+    ) external onlyAdmin {
+        //if a collateral is not valid and also not paused it must not exist.
+        if (!collateralValid[_collateralAddress]){
+            require(collateralPaused[_collateralAddress], "Unsupported collateral!");
+        } 
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
