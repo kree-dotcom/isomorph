@@ -11,8 +11,10 @@ uint256 constant ISOUSD_TIME_DELAY = 3 days;
 
 contract isoUSDToken is  ERC20, RoleControl(ISOUSD_TIME_DELAY) {
 
-    // Role based access control, minters can mint or burn isoUSD
+    // Role based access control, minters can mint isoUSD
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");  
+    // Role based access control, minters can burn isoUSD
+    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE"); 
 
 
     constructor() ERC20("IsomorphUSD", "isoUSD"){
@@ -26,17 +28,23 @@ contract isoUSDToken is  ERC20, RoleControl(ISOUSD_TIME_DELAY) {
         require(hasRole(MINTER_ROLE, msg.sender), "Caller is not a minter");
         _;
     }
+
+    //we decouple the minter and burner roles so that a Vault which has been removed from Minting can still burn existing debts
+    modifier onlyBurner{
+        require(hasRole(BURNER_ROLE, msg.sender), "Caller is not a burner");
+        _;
+    }
     
     
     
      /**
-      * @notice Only minters can burn isoUSD
+      * @notice Only burners can burn isoUSD
       * @dev burns 'amount' of tokens to address 'account', and emits Transfer event to 
       * to zero address.
       * @param _account The address of the token holder
       * @param _amount The amount of token to be burned.
      **/
-    function burn(address _account, uint256 _amount) external onlyMinter{
+    function burn(address _account, uint256 _amount) external onlyBurner{
         _burn(_account, _amount);
     }
     /**
