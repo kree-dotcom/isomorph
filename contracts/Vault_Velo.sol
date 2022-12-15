@@ -592,6 +592,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         CollateralNFTs calldata _loanNFTs, 
         uint256 _partialPercentage
         ) internal view returns(uint256){
+        IDepositReceipt depositReceipt = IDepositReceipt(_collateralAddress);
         //slither-disable-next-line uninitialized-local-variables
         uint256 totalPooledTokens;
         require(_partialPercentage <= LOAN_SCALE, "partialPercentage greater than 100%");
@@ -599,10 +600,10 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
                 if(_loanNFTs.slots[i] < NFT_LIMIT){
                     if((i == NFT_LIMIT -1) && (_partialPercentage > 0) && (_partialPercentage < LOAN_SCALE) ){
                         //final slot is NFT that will be split if necessary
-                        totalPooledTokens += ((depositReceipt.pooledTokens(userNFTs.ids[i]) * _partialPercentage) / LOAN_SCALE);
+                        totalPooledTokens += ((depositReceipt.pooledTokens(_loanNFTs.ids[i]) * _partialPercentage) / LOAN_SCALE);
                     } 
                     else{
-                        totalPooledTokens += depositReceipt.pooledTokens(userNFTs.ids[i]);
+                        totalPooledTokens += depositReceipt.pooledTokens(_loanNFTs.ids[i]);
                     }
                 }
                 
