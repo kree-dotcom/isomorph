@@ -187,15 +187,21 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
   /// @param _collateralAddress the token address of the collateral we wish to remove
   /// @param _currencyKey the related synthcode, here we use this to prevent accidentally pausing the wrong collateral token.
   /// @dev this should only be called on collateral no longer used by loans.
+  /// @dev This function can only be called if the collateral has been updated within 3min by calling updateVirtualPriceSlowly()
     function pauseCollateralType(
         address _collateralAddress,
         bytes32 _currencyKey
         ) external collateralExists(_collateralAddress) onlyAdmin {
         require(_collateralAddress != address(0)); //this should get caught by the collateralExists check but just to be careful
+        uint256 timeDelta = block.timestamp - collateralProps[_collateralAddress].lastUpdateTime;
+        uint256 threeMinDelta = timeDelta / THREE_MIN;
+        require(threeMinDelta == 0, "Must update virtualPrice first");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
         collateralValid[_collateralAddress] = false;
         collateralPaused[_collateralAddress] = true;
+        
+
         
     }
 
@@ -203,6 +209,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
   /// @param _collateralAddress the token address of the collateral we wish to remove
   /// @param _currencyKey the related synthcode, here we use this to prevent accidentally unpausing the wrong collateral token.
   /// @dev this should only be called on collateral that should be reenabled for taking loans against
+  /// @dev while a collateral is paused we charge no interest on it, so we update the timestamp to the current time to enforce this.
     function unpauseCollateralType(
         address _collateralAddress,
         bytes32 _currencyKey
@@ -213,6 +220,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
         collateralValid[_collateralAddress] = true;
         collateralPaused[_collateralAddress] = false;
+        //update collateral update time so users are not charged interest for the time period on which the collateral was paused.
+        _updateVirtualPriceAndTime(_collateralAddress, collateralProps[_collateralAddress].virtualPrice ,block.timestamp);
         
     }
     /// @dev Governnance callable only, this should be set once atomically on construction 
@@ -239,8 +248,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _updateTime
         ) internal  {
 
-        require( collateralProps[_collateralAddress].virtualPrice < _virtualPriceUpdate, "Incorrect virtual price" );
-        require( collateralProps[_collateralAddress].lastUpdateTime < _updateTime, "Incorrect timestamp" );
+        require( collateralProps[_collateralAddress].virtualPrice <= _virtualPriceUpdate, "Incorrect virtual price" );
+        require( collateralProps[_collateralAddress].lastUpdateTime <= _updateTime, "Incorrect timestamp" );
         collateralProps[_collateralAddress].virtualPrice = _virtualPriceUpdate;
         collateralProps[_collateralAddress].lastUpdateTime = _updateTime;
     }
@@ -267,7 +276,6 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
             Collateral memory collateral = collateralProps[_collateralAddress];
             uint256 timeDelta = block.timestamp - collateral.lastUpdateTime;
             uint256 threeMinDelta = timeDelta / THREE_MIN;
-    
             require(_cycles <= threeMinDelta, 'Cycle count too high');
                 for (uint256 i = 0; i < _cycles; i++ ){
                     collateral.virtualPrice = (collateral.virtualPrice * collateral.interestPer3Min) / DIVISION_BASE; 

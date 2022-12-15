@@ -8,7 +8,7 @@ const ZERO_ADDRESS = ethers.constants.AddressZero;
 const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
   
   
-  describe("Unit tests: CollateralBook contract", function () {
+  describe.only("Unit tests: CollateralBook contract", function () {
     const SYNTH = 1; //collateral identifer enum
     const LYRA = 2;
     const threeMinInterest = 100000180
@@ -28,7 +28,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
     const sETHLiqMargin = ethers.utils.parseEther("1.1");
     const sUSDLiqMargin = ethers.utils.parseEther("1.053");
     const sETHInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether") //realistic value
-    const sUSDInterest = ethers.utils.parseEther("1.19710969"); //1.001^180 i.e. 3 mins continiously compounding per second
+    const sUSDInterest = ethers.utils.parseEther("1.0000001"); // 3 mins continiously compounding per second
     let snapshotId;
     let setupTimeStamp;
     const provider = ethers.provider;
@@ -121,6 +121,8 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
       await collateralBook.pauseCollateralType(sETHaddress, sETHCode);
       expect(await collateralBook.collateralValid(sETHaddress)).to.equal(false);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(true);
+    
+
       await collateralBook.unpauseCollateralType(sETHaddress, sETHCode);
       expect(await collateralBook.collateralValid(sETHaddress)).to.equal(true);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(false);
@@ -151,11 +153,13 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
     it("Should fail to pause when conditions aren't met", async function () {
       expect(await collateralBook.collateralValid(sETHaddress)).to.equal(true);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(false);
+    
       await expect(collateralBook.pauseCollateralType(sETHaddress, sBTCCode)).to.be.revertedWith("Mismatched data");
       expect(await collateralBook.collateralValid(sETHaddress)).to.equal(true);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(false);
 
       expect(await collateralBook.collateralPaused(sBTCaddress)).to.equal(false);
+      
       await expect(collateralBook.pauseCollateralType(sBTCaddress, sBTCCode)).to.be.revertedWith("Unsupported collateral!");
       expect(await collateralBook.collateralValid(sBTCaddress)).to.equal(false);
       expect(await collateralBook.collateralPaused(sBTCaddress)).to.equal(false);
