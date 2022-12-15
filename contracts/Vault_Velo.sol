@@ -459,7 +459,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _NFTId
-        ) external whenNotPaused 
+        ) external 
         {
         _collateralExists(_collateralAddress);
         //zero indexes cause problems with mappings and ownership, so refuse them
@@ -524,7 +524,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         CollateralNFTs calldata _loanNFTs,
         uint256 _USDToVault,
         uint256 _partialPercentage
-        ) external whenNotPaused 
+        ) external 
         {
         _collateralExists(_collateralAddress);
         //check input NFT slots and ids are correct
@@ -550,7 +550,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
         uint256 colInUSD = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
-        if(outstandingisoUSD > 0){ //check for leftover debt
+        if((outstandingisoUSD > 0) && (_colInUSD > 0)){ //check for leftover debt
             uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
             require(collateralLeft >= borrowMargin , "Remaining debt fails to meet minimum margin!");
@@ -734,7 +734,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             address _collateralAddress,
             CollateralNFTs calldata _loanNFTs,
             uint256 _partialPercentage
-        ) external whenNotPaused  
+        ) external  
         {   
             _validMarketConditions(_collateralAddress, _loanHolder);
             for(uint256 i = 0; i < NFT_LIMIT; i++){

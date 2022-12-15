@@ -145,7 +145,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external override whenNotPaused 
+        ) external override
         {
         _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
@@ -189,7 +189,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external override whenNotPaused 
+        ) external override 
         {
         _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
@@ -260,7 +260,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external override whenNotPaused  
+        ) external override 
         {   
             _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 
