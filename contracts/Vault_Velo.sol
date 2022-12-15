@@ -550,7 +550,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
         uint256 colInUSD = _calculateProposedReturnedCapital(_collateralAddress, _loanNFTs, _partialPercentage);
-        if((outstandingisoUSD > 0) && (_colInUSD > 0)){ //check for leftover debt
+        if((outstandingisoUSD > 0) && (colInUSD > 0)){ //check for leftover debt
             uint256 collateralLeft = totalCollateralValue(_collateralAddress, msg.sender) - colInUSD;
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
             require(collateralLeft >= borrowMargin , "Remaining debt fails to meet minimum margin!");
