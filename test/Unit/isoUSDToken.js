@@ -5,6 +5,7 @@ const { helpers } = require("../testHelpers.js")
 
 const TIME_DELAY = 3 * 24 *60 *60 +1 //3 days + 1s
 const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
+const BURNER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("BURNER_ROLE"));
 
 describe("Unit tests: isoUSD contract", function () {
     let snapshotId;
@@ -44,13 +45,13 @@ describe("Unit tests: isoUSD contract", function () {
             await expect(tx).to.emit(isoUSD, 'QueueAddRole').withArgs(addr2.address, MINTER, owner.address, block.timestamp);
 
         })
-        it("should add a minter if following correct procedure", async function() {
+        it("should add a role if following correct procedure", async function() {
             await helpers.timeSkip(TIME_DELAY);
             await expect(isoUSD.connect(owner).addRole(addr2.address, MINTER)).to.emit(isoUSD, 'AddRole').withArgs(addr2.address, MINTER,  owner.address);
             expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(true);
         });
 
-        it("should be possible to add, remove then add the same minter again", async function() {
+        it("should be possible to add, remove then add the same role again", async function() {
             await helpers.timeSkip(TIME_DELAY);
             await expect(isoUSD.connect(owner).addRole(addr2.address, MINTER)).to.emit(isoUSD, 'AddRole').withArgs(addr2.address, MINTER, owner.address);
             expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(true);
@@ -64,7 +65,7 @@ describe("Unit tests: isoUSD contract", function () {
             expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(true);
         });
 
-        it("should fail to remove a non-existent minter", async function() {
+        it("should fail to remove a non-existent role", async function() {
             await expect(isoUSD.connect(owner).removeRole(addr2.address, MINTER)).to.be.revertedWith("Address was not already specified role");
             
 
@@ -121,8 +122,18 @@ describe("Unit tests: isoUSD contract", function () {
             await helpers.timeSkip(TIME_DELAY);
             await expect(isoUSD.connect(owner).addRole(addr2.address, MINTER)).to.emit(isoUSD, 'AddRole').withArgs(addr2.address,MINTER, owner.address);
             expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(true);
+            
+            const tx2 = await isoUSD.connect(owner).proposeAddRole(addr2.address, BURNER);
+            const block2 = await ethers.provider.getBlock(tx2.blockNumber);
+            await expect(tx2).to.emit(isoUSD, 'QueueAddRole').withArgs(addr2.address,BURNER, owner.address, block2.timestamp);
+            await helpers.timeSkip(TIME_DELAY);
+            await expect(isoUSD.connect(owner).addRole(addr2.address, BURNER)).to.emit(isoUSD, 'AddRole').withArgs(addr2.address,BURNER, owner.address);
+            expect( await isoUSD.hasRole(BURNER, addr2.address) ).to.equal(true);
+            
         })
-        it("should allow a minter to mint and burn", async function() {
+        
+        
+        it("should allow a minter/burner to mint and burn", async function() {
             const amount = 10000;
             const beforeisoUSD = await isoUSD.balanceOf(addr2.address);
             expect(beforeisoUSD).to.equal(0);
@@ -135,7 +146,7 @@ describe("Unit tests: isoUSD contract", function () {
 
         });
 
-        it("should revert if a minter tries to burn non-existent isoUSD", async function() {
+        it("should revert if a burner tries to burn non-existent isoUSD", async function() {
             const amount = 10000;
             const beforeisoUSD = await isoUSD.balanceOf(addr1.address);
             expect(beforeisoUSD).to.equal(0);
@@ -145,7 +156,7 @@ describe("Unit tests: isoUSD contract", function () {
 
         });
 
-        it("should revert if a minter tries to burn from zero address", async function() {
+        it("should revert if a burner tries to burn from zero address", async function() {
             const amount = 10000;
             const beforeisoUSD = await isoUSD.balanceOf(ZERO_ADDRESS);
             expect(beforeisoUSD).to.equal(0);
@@ -159,7 +170,18 @@ describe("Unit tests: isoUSD contract", function () {
             const amount = 10000;
             expect( await isoUSD.hasRole(MINTER, addr1.address) ).to.equal(false);
             await expect(isoUSD.connect(addr1).mint( amount)).to.be.revertedWith("Caller is not a minter");
-            await expect(isoUSD.connect(addr1).burn(addr2.address, amount)).to.be.revertedWith("Caller is not a minter");
+            await expect(isoUSD.connect(addr1).burn(addr2.address, amount)).to.be.revertedWith("Caller is not a burner");
+           
+
+        });
+        
+        it("should revert if a only burner role tries to mint", async function() {
+        expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(true);
+            await isoUSD.connect(owner).removeRole(addr2.address, MINTER)
+            const amount = 10000;
+            expect( await isoUSD.hasRole(MINTER, addr2.address) ).to.equal(false);
+            await expect(isoUSD.connect(addr1).mint( amount)).to.be.revertedWith("Caller is not a minter");
+            await expect(isoUSD.connect(addr1).burn(addr2.address, amount)).to.be.revertedWith("Caller is not a burner");
            
 
         });

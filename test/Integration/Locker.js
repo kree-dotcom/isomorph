@@ -199,8 +199,10 @@ describe("Integration tests: Locker contract", function() {
             expect(voting_balance_before).to.be.closeTo(amount.div(2), error)
 
             //Do relockVELO() call and check emitted event
+            const WEEK = 7*24*60*60 //1 week in seconds
+            const expected_lock = FOUR_YEARS - (FOUR_YEARS % WEEK)
             await expect(locker.relockVELO(id, FOUR_YEARS))
-                .to.emit(locker, 'RelockVeNFT').withArgs(id, FOUR_YEARS);
+                .to.emit(locker, 'RelockVeNFT').withArgs(id, expected_lock);
             
             //check locker balance of VELO is the same after relocking 
             let balance_after = await VELO.balanceOf(locker.address)

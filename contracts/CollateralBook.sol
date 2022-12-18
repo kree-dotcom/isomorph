@@ -101,11 +101,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _assetType,
         address _liquidityPool
 
-    ) external onlyAdmin {
-        //if a collateral is not valid and also not paused it must not exist.
-        if (!collateralValid[_collateralAddress]){
-            require(collateralPaused[_collateralAddress], "Unsupported collateral!");
-        } 
+    ) external onlyAdmin collateralExists(_collateralAddress) {
+        
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
@@ -198,7 +195,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(threeMinDelta == 0, "Must update virtualPrice first");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
-        collateralValid[_collateralAddress] = false;
+        //collateralValid[_collateralAddress] = false;
         collateralPaused[_collateralAddress] = true;
         
 
@@ -218,7 +215,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(collateralPaused[_collateralAddress], "Unsupported collateral or not Paused");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
-        collateralValid[_collateralAddress] = true;
+        //collateralValid[_collateralAddress] = true;
         collateralPaused[_collateralAddress] = false;
         //update collateral update time so users are not charged interest for the time period on which the collateral was paused.
         _updateVirtualPriceAndTime(_collateralAddress, collateralProps[_collateralAddress].virtualPrice ,block.timestamp);
@@ -309,7 +306,6 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         ) external onlyAdmin {
 
         require(!collateralValid[_collateralAddress], "Collateral already exists");
-        require(!collateralPaused[_collateralAddress], "Collateral already exists");
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio > 0);

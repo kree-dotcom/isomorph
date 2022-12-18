@@ -99,6 +99,7 @@ describe("Integration tests: Vault Synths contract", function () {
   const sETHCode = ethers.utils.formatBytes32String("sETH");
   const sBTCCode = ethers.utils.formatBytes32String("sBTC");
   const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
+  const BURNER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("BURNER_ROLE"));
 
   const sUSDaddr = addresses.optimism.sUSD;
   const sETHaddr = addresses.optimism.sETH;
@@ -179,6 +180,14 @@ describe("Integration tests: Vault Synths contract", function () {
         helpers.timeSkip(4) //4s for testing purposes otherwise synthetix price feeds become stale
         
         await isoUSD.addRole(vault.address, MINTER);
+
+        await isoUSD.proposeAddRole(vault.address, BURNER);
+      
+        //helpers.timeSkip(3*24*60*60+1) //3 days 1s required delay
+        helpers.timeSkip(4) //4s for testing purposes otherwise synthetix price feeds become stale
+        
+        await isoUSD.addRole(vault.address, BURNER);
+
         const sETHMinMargin = ethers.utils.parseEther("2.0");
         const sUSDMinMargin = ethers.utils.parseEther("1.8");
         const sETHLiqMargin = ethers.utils.parseEther("1.1");
@@ -209,8 +218,6 @@ describe("Integration tests: Vault Synths contract", function () {
       let PROXY_ERC20 = addresses.optimism.Proxy_ERC20;
       expect( await vault.EXCHANGE_RATES()).to.equal(EXCHANGE_RATES);
       expect( await vault.SYSTEM_STATUS()).to.equal(SYSTEM_STATUS);
-      expect( await vault.SUSD_ADDR()).to.equal(sUSDaddr);
-      expect( await vault.PROXY_ERC20()).to.equal(PROXY_ERC20);
     });
   });
   
@@ -498,7 +505,7 @@ describe("Integration tests: Vault Synths contract", function () {
       await collateralBook.pauseCollateralType(sETH.address, sETHCode);
       await expect(
         vault.connect(addr2).openLoan(sETH.address, collateralUsed, loanTaken)
-      ).to.be.revertedWith("Unsupported collateral!");
+      ).to.be.revertedWith("Paused collateral!");
     });
 
     it("Should fail if the market is closed", async function () {
@@ -716,6 +723,8 @@ describe("Integration tests: Vault Synths contract", function () {
       
     });
 
+    //remove this test and replace with one that checks liquidatable amount is reduced on adding collateral.
+    /*
     it("Should fail if accrued interest means debt is still too large", async function () {
       const loanIncrease = ethers.utils.parseEther('300');
       await vault.connect(addr1).openLoan(sUSD.address, 0, loanIncrease);
@@ -743,6 +752,7 @@ describe("Integration tests: Vault Synths contract", function () {
       await expect(vault.connect(addr1).increaseCollateralAmount(sUSD.address, collateralUsed)).to.be.revertedWith("Liquidation margin not met!");
       
     });
+    */
     
     
     it("Should fail if using unsupported collateral token", async function () {
@@ -752,21 +762,17 @@ describe("Integration tests: Vault Synths contract", function () {
       
     });
 
-    it("Should fail if vault paused", async function () {
+    it("Should succeed even if the vault is paused", async function () {
       const collateralAdded = totalCollateralUsing.sub(collateralUsed)
       await vault.pause();
-      await expect(vault.connect(addr1).increaseCollateralAmount(sUSD.address, collateralAdded)).to.be.revertedWith("Pausable: paused");
-      
-      
+      await vault.connect(addr1).increaseCollateralAmount(sUSD.address, collateralAdded);
     });
 
-    it("Should fail if collateral is paused in CollateralBook", async function () {
+    it("Should succeed if collateral is paused in CollateralBook", async function () {
       const collateralAdded = totalCollateralUsing.sub(collateralUsed)
       //pause collateral in collateralBook
       await collateralBook.pauseCollateralType(sUSD.address, sUSDCode);
-
-      await expect(vault.connect(addr1).increaseCollateralAmount(sUSD.address, collateralAdded)).to.be.revertedWith("Unsupported collateral!");
-      
+      await vault.connect(addr1).increaseCollateralAmount(sUSD.address, collateralAdded);
     });
 
     it("Should fail if the market is closed", async function () {
@@ -898,36 +904,6 @@ describe("Integration tests: Vault Synths contract", function () {
       
     });
 
-    it("Should return full user isoUSD if remaining debt is less than $0.001", async function () {
-      
-      let realDebt = await vault.isoUSDLoanAndInterest(sUSD.address, addr1.address);
-      let virtualPrice = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
-      const valueClosing = (realDebt.mul(virtualPrice).div(e18)).sub(100);
-      const beforeisoUSDBalance = await isoUSD.balanceOf(addr1.address);
-      const beforeColBalance = await sUSD.balanceOf(addr1.address);
-      const principleBefore = await vault.isoUSDLoaned(sUSD.address, addr1.address)
-      const requestedCollateral = collateralAmount;
-
-      //approve loan repayment and call closeLoan
-      await isoUSD.connect(addr1).approve(vault.address, valueClosing);
-      await expect (vault.connect(addr1).closeLoan(sUSDaddr, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan').withArgs(addr1.address, valueClosing, sUSDCode, requestedCollateral);
-      
-      const AfterisoUSDBalance = await isoUSD.balanceOf(addr1.address);
-      expect(AfterisoUSDBalance).to.equal(beforeisoUSDBalance.sub(valueClosing));
-
-      const AfterColBalance = await sUSD.balanceOf(addr1.address);
-      expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
-
-      //a fully paid loan should repay nearly all principle leaving only dust behind
-      const principle = await vault.isoUSDLoaned(sUSD.address, addr1.address)
-      let error = principleBefore.div(100000) //0.001%
-      expect(principle).to.be.closeTo(zero, error)
-
-      //a fully repaid loan should repay all interest also, minus dust again 
-      const totalLoan = await vault.isoUSDLoanAndInterest(sUSD.address, addr1.address)
-      expect(totalLoan).to.be.closeTo(zero, error)
-    });
-
     it("Should allow reducing margin ratio if in excess by drawing out collateral", async function () {
       let realDebt = await vault.isoUSDLoanAndInterest(sUSD.address, addr1.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
@@ -1052,19 +1028,19 @@ describe("Integration tests: Vault Synths contract", function () {
       ).to.be.revertedWith("Synth is suspended. Operation prohibited");
     });
 
-    it("Should fail to close if the contract is paused", async function () {
+    it("Should succeed to close if the contract is paused", async function () {
       await vault.pause();
-      await expect(
-        vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2)
-      ).to.be.revertedWith("Pausable: paused");
+      const user_balance = await isoUSD.balanceOf(addr1.address);
+      await isoUSD.connect(addr1).approve(vault.address, user_balance)
+      await vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2);
 
     });
 
-    it("Should fail to close if collateral is paused in CollateralBook", async function () {
+    it("Should succeed to close if collateral is paused in CollateralBook", async function () {
       await collateralBook.pauseCollateralType(sUSD.address, sUSDCode);
-      await expect(
-        vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2)
-      ).to.be.revertedWith("Unsupported collateral!");
+      const user_balance = await isoUSD.balanceOf(addr1.address);
+      await isoUSD.connect(addr1).approve(vault.address, user_balance)
+      await vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2);
     });
 
     it("Should fail to close if an invalid collateral is used", async function () {
@@ -1088,20 +1064,6 @@ describe("Integration tests: Vault Synths contract", function () {
       await expect(
         vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2)
       ).to.be.revertedWith("Insufficient user isoUSD balance!");
-    });
-
-    it("Should fail to close if user tries to return more isoUSD than borrowed originally", async function () {
-      //take another loan to get more isoUSD to send to addr1
-      await sUSD.connect(owner).transfer(addr2.address, collateralAmount);
-      await sUSD.connect(addr2).approve(vault.address, collateralAmount);
-      await vault.connect(addr2).openLoan(sUSDaddr, collateralAmount2, loanAmount2);
-      const isoUSDAmount = await isoUSD.balanceOf(addr2.address);
-      await isoUSD.connect(addr2).transfer(addr1.address, isoUSDAmount );
-
-      await expect(
-        //try to repay loan plus a small amount
-        vault.connect(addr1).closeLoan(sUSDaddr, collateralAmount2, loanAmount2.mul(11).div(10))
-      ).to.be.revertedWith("Trying to return more isoUSD than borrowed!");
     });
 
     it("Should fail to close if partial loan closure results in an undercollateralized loan", async function () {
@@ -1453,11 +1415,11 @@ describe("Integration tests: Vault Synths contract", function () {
 
     });
 
-    it("Should fail if system is paused", async function () {
+    it("Should succeed liquidation even if vault is paused", async function () {
       await vault.pause();
-      await expect(
-        vault.connect(addr2).callLiquidation(addr1.address, sETHaddr)
-      ).to.be.revertedWith("Pausable: paused");
+      const user_balance = await isoUSD.balanceOf(addr2.address)
+      await isoUSD.connect(addr2).approve(vault.address, user_balance)
+      await vault.connect(addr2).callLiquidation(addr1.address, sETHaddr);
     });
 
     it("Should fail to liquidate if the collateral token is unsupported", async function () {
@@ -1466,11 +1428,11 @@ describe("Integration tests: Vault Synths contract", function () {
       ).to.be.revertedWith("Unsupported collateral!");
     });
 
-    it("Should fail to liquidate if the collateral is paused in CollateralBook", async function () {
+    it("Should succeed liquidation if the collateral is paused in CollateralBook", async function () {
       await collateralBook.pauseCollateralType(sETH.address, sETHCode);
-      await expect(
-        vault.connect(addr2).callLiquidation(addr1.address, sETH.address)
-      ).to.be.revertedWith("Unsupported collateral!");
+      const user_balance = await isoUSD.balanceOf(addr2.address)
+      await isoUSD.connect(addr2).approve(vault.address, user_balance)
+      await vault.connect(addr2).callLiquidation(addr1.address, sETHaddr);
     });
 
 

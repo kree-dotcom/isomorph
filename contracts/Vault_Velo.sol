@@ -69,8 +69,8 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     address public pendingTreasury;
     uint256 public updateTreasuryTimestamp;
 
-    IisoUSDToken public isoUSD;
-    ICollateralBook public collateralBook;
+    IisoUSDToken private isoUSD;
+    ICollateralBook private collateralBook;
     
 
     
@@ -387,6 +387,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         ) external whenNotPaused  
         {   
             _collateralExists(_collateralAddress);
+            require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
             //slither-disable-next-line uninitialized-local-variables
             IDepositReceipt depositReceipt;
             //slither-disable-next-line uninitialized-local-variables

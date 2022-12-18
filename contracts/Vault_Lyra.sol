@@ -106,6 +106,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         ) external override whenNotPaused 
         {
         _collateralExists(_collateralAddress);
+        require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
         IERC20 collateral = IERC20(_collateralAddress);
         
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");

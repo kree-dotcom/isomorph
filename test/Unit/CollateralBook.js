@@ -8,7 +8,7 @@ const ZERO_ADDRESS = ethers.constants.AddressZero;
 const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
   
   
-  describe.only("Unit tests: CollateralBook contract", function () {
+  describe("Unit tests: CollateralBook contract", function () {
     const SYNTH = 1; //collateral identifer enum
     const LYRA = 2;
     const threeMinInterest = 100000180
@@ -119,7 +119,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
       expect(await collateralBook.collateralValid(sETHaddress)).to.equal(true);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(false);
       await collateralBook.pauseCollateralType(sETHaddress, sETHCode);
-      expect(await collateralBook.collateralValid(sETHaddress)).to.equal(false);
+      expect(await collateralBook.collateralValid(sETHaddress)).to.equal(true);
       expect(await collateralBook.collateralPaused(sETHaddress)).to.equal(true);
     
 
