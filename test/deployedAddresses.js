@@ -24,6 +24,7 @@ const sETH_OP = `0xE405de8F52ba7559f9df3C368500B6E6ae6Cee49`;
 const sBTC_OP = `0x298B9B95708152ff6968aafd889c6586e9169f1D`;
 const Synthetix_owner_OP = `0x6d4a64C57612841c2C6745dB2a4E4db34F002D20`;
 const system_OP = `0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD`;
+const Address_Resolver = "0x95A6a3f44a70172E7d50a9e28c85Dfd712756B8C";
 const sUSDDoner_OP = "0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b" //"0x2f17058C77F70F52D89AA5D54300b30EEf9FA6fC"; //doner for sUSD
 const SETHDoner_OP = "0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b" //`0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b`; //doner for sETH
 const Exchange_Rates_OP = `0x22602469d704BfFb0936c7A7cfcD18f7aA269375`; //Synth exchange rates 
@@ -94,6 +95,7 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             System: system_OP, sUSD_Doner: sUSDDoner_OP,
                             sETH_Doner: SETHDoner_OP, Exchange_Rates: Exchange_Rates_OP,
                             System_Status: System_Status_OP, Proxy_ERC20: Proxy_ERC20_OP,
+                            Address_Resolver : Address_Resolver,
                             Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
                             Lyra_Doner: Lyra_Doner,
                             Lyra_Rewards_Distributor : Lyra_Rewards_Distributor,

@@ -98,6 +98,8 @@ describe("Integration tests: Vault Synths contract", function () {
   const sUSDCode = ethers.utils.formatBytes32String("sUSD");
   const sETHCode = ethers.utils.formatBytes32String("sETH");
   const sBTCCode = ethers.utils.formatBytes32String("sBTC");
+  const EXCHANGER = ethers.utils.formatBytes32String("Exchanger");
+  const EXCHANGE_RATES = ethers.utils.formatBytes32String("ExchangeRates");
   const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
   const BURNER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("BURNER_ROLE"));
 
@@ -107,12 +109,16 @@ describe("Integration tests: Vault Synths contract", function () {
 
   const sUSDDoner = addresses.optimism.sUSD_Doner
   const SETHDoner = addresses.optimism.sETH_Doner
+  const addressResolver_address = addresses.optimism.Address_Resolver
   
   const provider = ethers.provider;
 
   const sUSD = new ethers.Contract(sUSDaddr, ABIs.ERC20, provider);
   const sETH = new ethers.Contract(sETHaddr, ABIs.ERC20, provider);
   const sBTC = new ethers.Contract(sBTCaddr, ABIs.ERC20, provider);
+  //Synthetix contracts we sset up later
+  let exchangeRates
+  let exchanger
 
   //consts used for maths or the liquidation system
   const colQuantity = ethers.utils.parseEther('2.77');
@@ -197,6 +203,11 @@ describe("Integration tests: Vault Synths contract", function () {
         await collateralBook.addCollateralType(sETH.address, sETHCode, sETHMinMargin, sETHLiqMargin, sETHInterest, SYNTH, ZERO_ADDRESS);
         await collateralBook.addCollateralType(sUSD.address, sUSDCode, sUSDMinMargin, sUSDLiqMargin, sUSDInterest, SYNTH, ZERO_ADDRESS);
         
+        const addressResolver = new ethers.Contract(addressResolver_address, ABIs.AddressResolver, provider);
+        let exchangeRates_address = await addressResolver.getAddress(EXCHANGE_RATES)
+        let exchanger_address = await addressResolver.getAddress(EXCHANGER)
+        exchangeRates = new ethers.Contract(exchangeRates_address, ABIs.ExchangeRates, provider);
+        exchanger = new ethers.Contract(exchanger_address, ABIs.Exchanger, provider);
       });
 
       beforeEach(async () => {
@@ -213,10 +224,8 @@ describe("Integration tests: Vault Synths contract", function () {
       
   describe("Construction", function (){
     it("Should deploy the right Synthetix external contract addresses", async function (){
-      const EXCHANGE_RATES = addresses.optimism.Exchange_Rates;
       const SYSTEM_STATUS = addresses.optimism.System_Status;
-      let PROXY_ERC20 = addresses.optimism.Proxy_ERC20;
-      expect( await vault.EXCHANGE_RATES()).to.equal(EXCHANGE_RATES);
+      //expect( await vault.EXCHANGE_RATES()).to.equal(EXCHANGE_RATES);
       expect( await vault.SYSTEM_STATUS()).to.equal(SYSTEM_STATUS);
     });
   });
@@ -446,7 +455,7 @@ describe("Integration tests: Vault Synths contract", function () {
       
     });
 
-    it("Should only not update virtualPrice if called multiple times within 3 minutes", async function () {
+    it("Should not update virtualPrice more than once if called multiple times within 3 minutes", async function () {
       const minimumLoan = ethers.utils.parseEther('100');
       await sUSD.connect(addr1).approve(vault.address, collateralUsed);
 
@@ -466,7 +475,7 @@ describe("Integration tests: Vault Synths contract", function () {
       expect(virtualPrice_1).to.equal(virtualPrice_2)
     });
 
-    it("Should only not update another collateral's virtualPrice if called", async function () {
+    it("Should not update another collateral's virtualPrice if called", async function () {
       const minimumLoan = ethers.utils.parseEther('100'); 
       await sUSD.connect(addr1).approve(vault.address, collateralUsed);
 
@@ -478,6 +487,23 @@ describe("Integration tests: Vault Synths contract", function () {
       
       //if we are within 3 minutes both virtual prices should be the same
       expect(virtualPrice_other_asset).to.equal(virtualPrice_other_asset_after)
+    });
+
+    it("Should fail to open a loan if MinOpeningMargin is not met due to Synthetix exchange fees ", async function () {
+      await impersonateForToken(provider, addr1, sETH, SETHDoner, collateralUsed)
+
+      let collateralValue = await exchangeRates.effectiveValue(sETHCode, collateralUsed, sUSDCode);
+      let fee = await exchanger.feeRateForExchange(sETHCode, sUSDCode);
+
+      const sETHMinMargin = (await collateralBook.collateralProps(sETH.address))[1]
+      let unsafeLoanAmount = collateralValue.div(sETHMinMargin).mul(base)
+
+      await sETH.connect(addr1).approve(vault.address, collateralUsed);
+      await expect(vault.connect(addr1).openLoan(sETH.address, collateralUsed, unsafeLoanAmount)).to.be.revertedWith("Minimum margin not met!")
+      
+      //but if we adjust for exchange fee the loan should succeed
+      let safeLoanAmount = (collateralValue.mul(base.sub(fee)).div(base)).div(sETHMinMargin).mul(base)
+      await vault.connect(addr1).openLoan(sETH.address, collateralUsed, safeLoanAmount)
     });
     
     it("Should fail if daily max Loan amount exceeded", async function () {
@@ -1464,7 +1490,28 @@ describe("Integration tests: Vault Synths contract", function () {
     
   });
 
+  describe("priceCollateralToUSD", function () {
+    before(async function () {
+    });
+
+    it("Should correctly price Synth swaps to sUSD", async function () {
+      let amount = ethers.utils.parseEther("1000");
+      let expectedUSD = await vault.priceCollateralToUSD(sETHCode , amount)
+      let exchangeAmount = await exchangeRates.effectiveValue(sETHCode, amount, sUSDCode);
+      let fee = await exchanger.feeRateForExchange(sETHCode, sUSDCode);
+      let exchangeAmountAfterFee = exchangeAmount.mul(base.sub(fee)).div(base)
+      expect(expectedUSD).to.equal(exchangeAmountAfterFee)
+
+      let amount_2 = ethers.utils.parseEther("569");
+      let expectedUSD_2 = await vault.priceCollateralToUSD(sBTCCode , amount_2)
+      let exchangeAmount_2 = await exchangeRates.effectiveValue(sBTCCode, amount_2, sUSDCode);
+      let fee_2 = await exchanger.feeRateForExchange(sBTCCode, sUSDCode);
+      let exchangeAmountAfterFee_2 = exchangeAmount_2.mul(base.sub(fee_2)).div(base)
+      expect(expectedUSD_2).to.equal(exchangeAmountAfterFee_2)
+    });      
   
+    
+  });
 
 
   describe("setDailyMax", function () {

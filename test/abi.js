@@ -1,11 +1,22 @@
 //ABIs required when pointing to existing smart contracts
 
+const AddressResolver = [
+  "function getAddress(bytes32 code) external view returns(address)"
+]
 const SynthSystem = [
     // Some details about the token
   "function suspendSynth(bytes32, uint256) external",
   "function resumeSynths(bytes32[]) external",
   "function synthSuspension(bytes32) external view returns(bool, uint248)"
   ];
+  
+const Exchanger = [
+   "function feeRateForExchange(bytes32 SynthIn, bytes32 SynthOut) external view returns(uint256)"
+]
+
+const ExchangeRates = [
+   "function effectiveValue(bytes32 SynthIn, uint256 amount, bytes32 SynthOut) external view returns(uint256)"
+]
 
 const ERC20 = [
     // Some details about the token
@@ -94,6 +105,9 @@ const ERC20 = [
   ABIs = {
           ERC20: ERC20, 
           SynthSystem: SynthSystem, 
+          Exchanger: Exchanger,
+          ExchangeRates: ExchangeRates,
+          AddressResolver: AddressResolver,
           LyraLP :LyraLP, 
           LyraRewardsDistro: LyraRewardsDistro,
           GreekCache : GreekCache,

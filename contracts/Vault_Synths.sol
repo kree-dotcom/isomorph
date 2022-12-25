@@ -8,6 +8,8 @@ pragma abicoder v2;
 // External Synthetix interfaces
 import "./helper/interfaces/ISynthetix.sol";
 import "./helper/interfaces/IExchangeRates.sol";
+import "./helper/interfaces/IAddressResolver.sol";
+import "./helper/interfaces/IExchanger.sol";
 import "./helper/interfaces/ISystemStatus.sol";
 
 //Vault Base for common functions
@@ -18,14 +20,18 @@ contract Vault_Synths is Vault_Base_ERC20 {
     
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
+    bytes32 private constant EXCHANGE_RATES = "ExchangeRates";
+    bytes32 private constant EXCHANGER = "Exchanger";
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
     
     //Optimism Mainnet addresses
     
-    address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
+    //address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
+    address public constant ADDRESS_RESOLVER = 0x95A6a3f44a70172E7d50a9e28c85Dfd712756B8C;
+    IAddressResolver addressResolver = IAddressResolver(ADDRESS_RESOLVER);
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
     
-    IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
+    //IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
     ISystemStatus private synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);
    
     
@@ -70,10 +76,15 @@ contract Vault_Synths is Vault_Base_ERC20 {
     //isoUSD is assumed to be valued at $1 by all of the system to avoid oracle attacks. 
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
     /// @param _amount quantity of collateral to price into sUSD
-    /// @return returns the value of the given synth in sUSD which is assumed to be pegged at $1.
+    /// @return returns the value of the given synth in sUSD after Synthetix exchange fees.
     function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount) public view override returns(uint256){
-        //As it is a synth use synthetix for pricing
-        return (synthetixExchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE));      
+        //As it is a synth use synthetix for pricing, we fetch the Synthetix pricing contracts each time as they occasionally are updated.
+        IExchanger exchanger = IExchanger(addressResolver.getAddress(EXCHANGER));
+        IExchangeRates exchangeRates = IExchangeRates(addressResolver.getAddress(EXCHANGE_RATES));
+        uint256 exchangeAmount = exchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE);
+        uint256 fee = exchanger.feeRateForExchange(_currencyKey, SUSD_CODE);
+        uint256 exchangeAmountAfterFee = (exchangeAmount * (LOAN_SCALE - fee))/LOAN_SCALE;
+        return (exchangeAmountAfterFee);      
     }
 
     /**
