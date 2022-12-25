@@ -32,6 +32,7 @@ const Proxy_ERC20_OP = `0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4`; //Proxy for
 const Lyra_LP = "0x5Db73886c4730dBF3C562ebf8044E19E8C93843e"; //Lyra's sETH Liquidity Pool 
 const Lyra_LP_token = `0x0d1a91354A387a1e9E8FCD8f576670c4C3b723cA` //Lyra's sETH LP token
 const Lyra_Doner = `0x9644A6920bd0a1923C2C6C1DddF691b7a42e8A65`
+const Lyra_Rewards_Distributor = `0x019f0233c0277b9422fcdb1213b09c86f5f27d87`; //MultiDistribution contract used to allocate OP and stkLYRA rewards to LPs
 const USDC = `0x7F5c764cBc14f9669B88837ca1490cCa17c31607` 
 const router = "0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9"
 const chainlink_SUSD_feed = "0x7f99817d87baD03ea21E05112Ca799d715730efe"
@@ -95,6 +96,7 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             System_Status: System_Status_OP, Proxy_ERC20: Proxy_ERC20_OP,
                             Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
                             Lyra_Doner: Lyra_Doner,
+                            Lyra_Rewards_Distributor : Lyra_Rewards_Distributor,
                             USDC: USDC, Router: router,
                             Chainlink_SUSD_Feed : chainlink_SUSD_feed,
                             VELO : VELO, Velo_Voter : Velo_Voter, 

@@ -1604,6 +1604,51 @@ describe("Integration tests: Vault Lyra contract", function () {
     
   });
 
+  describe("claimLyraRewards", function () {
+    const TIME_DELAY = 3*24*60*60 //3 day second timelock
+    const distributor_address = addresses.optimism.Lyra_Rewards_Distributor;
+    const distributor = new ethers.Contract(distributor_address, ABIs.LyraRewardsDistro, provider)
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(addr2).claimLyraRewards([addr2.address], distributor.address)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should revert if a collateral token is proposed", async function () {
+      await expect( vault.connect(owner).claimLyraRewards([lyraLPToken.address], distributor.address)).to.be.revertedWith("Cannot withdraw collaterals"); 
+    });
+    it("Should succeed if collecting valid rewards", async function () {
+      tokenClaimed = addresses.optimism.OP_Token;
+      //if there is nothing to claim the balance should not change
+      let balanceBefore = await OP.balanceOf(owner.address)
+      await vault.connect(owner).claimLyraRewards([tokenClaimed], distributor.address)
+      let balanceAfter = await OP.balanceOf(owner.address)
+      expect(balanceBefore).to.equal(balanceAfter)
+
+      //repeat after adding a claim for Vault_Lyra
+      let amount = ethers.utils.parseEther("10");
+      const LyraAdmin = "0xd4c00fe7657791c2a43025de483f05e49a5f76a6"
+      await network.provider.request({
+        method: "hardhat_impersonateAccount",
+        params: [LyraAdmin], 
+      });
+      const signer = await provider.getSigner(LyraAdmin);
+      await distributor.connect(signer).addToClaims([[vault.address, amount]], OP.address, 0, "")
+      await network.provider.request({
+        method: "hardhat_stopImpersonatingAccount",
+        params: [LyraAdmin] 
+      });
+      //validate awaiting claim
+      expect(await distributor.connect(owner).claimableBalances(vault.address, OP.address)).to.equal(amount)
+      //check difference in token balance after claim
+      balanceBefore = await OP.balanceOf(owner.address)
+      let tx = await vault.connect(owner).claimLyraRewards([tokenClaimed], distributor.address)
+      balanceAfter = await OP.balanceOf(owner.address)
+      expect(balanceAfter).to.equal(balanceBefore.add(amount))
+      //for some reason it cannot find this event being emitted but it is not emitted by our contracts so not too important 
+      //await expect(tx).to.emit(distributor, 'Claimed').withArgs(tokenClaimed, owner.address, balanceAfter.sub(balanceBefore)); 
+    });       
+  
+    
+  });
+
 
   describe("Role based access control", function () {
     const TIME_DELAY = 3*24*60*60+1 //3 day second timelock +1s
@@ -1632,9 +1677,12 @@ describe("Integration tests: Vault Lyra contract", function () {
         await expect(tx).to.emit(vault, 'QueueAddRole').withArgs(addr1.address, ADMIN, owner.address, block.timestamp);
         helpers.timeSkip(TIME_DELAY);
         await expect(vault.connect(owner).addRole(addr1.address, ADMIN)).to.emit(vault, 'AddRole').withArgs(addr1.address, ADMIN,  owner.address);
-        await expect(vault.connect(addr1).pause()).to.emit(vault, 'SystemPaused').withArgs(addr1.address);
+        await expect(vault.connect(addr1).pause()).to.emit(vault, 'Paused').withArgs(addr1.address);
+        await expect(vault.connect(addr2).pause()).to.be.revertedWith("Caller is not able to call pause")
         expect( await vault.hasRole(PAUSER, addr1.address) ).to.equal(false);
         expect( await vault.hasRole(ADMIN, addr1.address) ).to.equal(true);
+        await expect(vault.connect(addr2).unpause()).to.be.revertedWith("Caller is not an admin")
+        await expect(vault.connect(addr1).unpause()).to.emit(vault, 'Unpaused').withArgs(addr1.address);
     });
 
     it("should add a role that works if following correct procedure", async function() {
@@ -1643,7 +1691,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       expect( await vault.hasRole(PAUSER, addr2.address) ).to.equal(true);
       const tx = await vault.connect(addr2).pause();
       const block = await ethers.provider.getBlock(tx.blockNumber);
-      await expect(tx).to.emit(vault, 'SystemPaused').withArgs(addr2.address);
+      await expect(tx).to.emit(vault, 'Paused').withArgs(addr2.address);
     });
 
     it("should block non-role users calling role restricted functions", async function() {

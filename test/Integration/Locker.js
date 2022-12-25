@@ -247,60 +247,40 @@ describe("Integration tests: Locker contract", function() {
             //force a certain timestamp to make checking the emitted event easier
             let new_timestamp = last_timestamp + time_increase
             await helpers.timeSkip(time_increase)
-            await expect(locker.vote([ids[0]],[sAMM_USDC_sUSD], [FULL_WEIGHT])
-                ).to.emit(locker, 'NFTVoted')
-                //.withArgs(ids[0], new_timestamp)
-                //.to.emit(voter, 'Voted')
-                //.withArgs(locker.address, ids[0], FULL_WEIGHT)
-
-            
+            let tx = await locker.vote([ids[0]],[sAMM_USDC_sUSD], [FULL_WEIGHT])
+            await expect (tx).to.emit(locker, 'NFTVoted').withArgs(ids[0], new_timestamp)
+            await expect (tx).to.emit(voter, 'Voted')//.withArgs(locker.address, ids[0], FULL_WEIGHT)            
 
         });
-        //problems to fix, 'Voted' events state specified args are not emitted,
-        // how to capture block.timestamp WITHOUT capturing tx, finding block and then getting it? I.e. syncronously
+
         it("Should be able to vote with a single veNFT for multiple pools", async function() {
             this.timeout(100000)
             vAMM_WETH_BIFI = "0x17d99c78F1AA7870ab30FB3E93b2fE9F6502d192"
             TEN_PERCENT = 1000
             let new_timestamp = last_timestamp + time_increase
             await helpers.timeSkip(time_increase)
-            await expect(locker.vote([ids[0]],[sAMM_USDC_sUSD, vAMM_WETH_BIFI], [FULL_WEIGHT- TEN_PERCENT, TEN_PERCENT])
-                ).to.emit(voter, 'Voted').to.emit(voter, 'Voted').to.emit(locker, 'NFTVoted')
-                //.withArgs(locker.address, ids[0], FULL_WEIGHT- TEN_PERCENT)
-                
-                //.withArgs(locker.address, ids[0], TEN_PERCENT);
-                
-                //.withArgs(ids[0], new_timestamp)
-            
-            //const receipt = tx.wait()
-            //const block = await ethers.provider.getBlock(tx.blockNumber);
-            //console.log("EVENTS ", receipt.events)
-            //for (const event of receipt.events) {
-            //    console.log(`Event ${event.event} with args ${event.args}`);
-            //}
-
-            //expect(tx).to.emit(locker, 'Voted').withArgs(ids[0], block.timestamp)
+            let tx = await locker.vote([ids[0]],[sAMM_USDC_sUSD, vAMM_WETH_BIFI], [FULL_WEIGHT- TEN_PERCENT, TEN_PERCENT])
+            const block = await ethers.provider.getBlock(tx.blockNumber);
+            await expect(tx).to.emit(locker, 'NFTVoted').withArgs(ids[0], block.timestamp)
+            //work out voting weight to determine expected voting power 
+            let total_voting_power = await voting_escrow.balanceOfNFT(ids[0])
+            await expect(tx).to.emit(voter, 'Voted')//.withArgs(locker.address, ids[0], total_voting_power.mul(FULL_WEIGHT- TEN_PERCENT).div(FULL_WEIGHT))
+            await expect(tx).to.emit(voter, 'Voted')//.withArgs(locker.address, ids[0], total_voting_power.mul(TEN_PERCENT).div(FULL_WEIGHT));
 
         });
 
-        //problems to fix, 'Voted' events state specified args are not emitted,
-        // how to capture block.timestamp WITHOUT capturing tx, finding block and then getting it? I.e. syncronously
         it("Should be able to vote with multiple veNFTs", async function() {
             
             let new_timestamp = last_timestamp + time_increase
             await helpers.timeSkip(time_increase)
 
-            await  expect(locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
-                ).to.emit(locker, 'NFTVoted').to.emit(locker, 'NFTVoted').to.emit(voter, 'Voted').to.emit(voter, 'Voted')
-                
-                // check for locker events
-                //.withArgs(ids[0], new_timestamp)
-                
-                //.withArgs(ids[1], new_timestamp)
-                 //check for Velodrome's Voter.sol emitting events
-                //.withArgs(locker.address, ids[0], FULL_WEIGHT)
-                
-                //.withArgs(locker.address, ids[1], FULL_WEIGHT)
+            let tx = await locker.vote(ids,[sAMM_USDC_sUSD], [FULL_WEIGHT])
+            const block = await ethers.provider.getBlock(tx.blockNumber);
+            await expect(tx).to.emit(locker, 'NFTVoted').withArgs(ids[0], block.timestamp)
+            let total_voting_power_0 = await voting_escrow.balanceOfNFT(ids[0])
+            let total_voting_power_1 = await voting_escrow.balanceOfNFT(ids[0])
+            await expect(tx).to.emit(voter, 'Voted')//.withArgs(locker.address, ids[0], total_voting_power_0)
+            await expect(tx).to.emit(voter, 'Voted')//.withArgs(locker.address, ids[1], total_voting_power_1)
 
         });
 
@@ -385,13 +365,11 @@ describe("Integration tests: Locker contract", function() {
             let locked_tokens = await voting_escrow.locked(id)
 
             //Do withdrawNFT() call and check emitted event
-            await expect(locker.withdrawNFT(id, slot)
-                ).to.emit(locker, 'WithdrawVeNFT').to.emit(voting_escrow, 'Withdraw').to.emit(voting_escrow, 'Supply')
-                //.withArgs(id, timestamp);
-                
-                //.withArgs()
-                
-                //.withArgs()
+            let tx = await locker.withdrawNFT(id, slot)
+            const block = await ethers.provider.getBlock(tx.blockNumber);
+            await expect(tx).to.emit(locker, 'WithdrawVeNFT').withArgs(id, block.timestamp);
+            await expect(tx).to.emit(voting_escrow, 'Withdraw')//.withArgs()
+            await expect(tx).to.emit(voting_escrow, 'Supply')//.withArgs()
             
             //check locker balance of VELO is replenished  
             let balance_after = await VELO.balanceOf(locker.address)

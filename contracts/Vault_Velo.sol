@@ -84,9 +84,6 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
     event ChangeTreasury(address oldTreasury, address newTreasury);
-
-    event SystemPaused(address indexed pausedBy);
-    event SystemUnpaused(address indexed unpausedBy);
     
 
 
@@ -140,12 +137,10 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     /// @notice sets state to paused only triggerable by pauser (all admins can call Pauser functions also)
     function pause() external onlyPauser {
         _pause();
-        emit SystemPaused(msg.sender);
     }
     /// @notice sets state to unpaused only triggerable by admin
     function unpause() external onlyAdmin {
         _unpause();
-        emit SystemUnpaused(msg.sender);
     }
 
     /// @notice dailyMax can be set to 0 effectively preventing anyone from opening new loans.

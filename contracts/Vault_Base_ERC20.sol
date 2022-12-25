@@ -32,12 +32,12 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     mapping(address => mapping(address => uint256)) public isoUSDLoanAndInterest;
 
     //variables relating to access control and setting new roles
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 internal constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    uint256 public constant LOAN_SCALE = 1 ether; //base for division/decimal maths
-    uint256 private constant THREE_MIN = 180;
+    uint256 internal constant LOAN_SCALE = 1 ether; //base for division/decimal maths
+    uint256 internal constant THREE_MIN = 180;
 
     //Enums// collateral type identifiers to revert if the wrong collateral is interacted with by the wrong Vault.
     enum AssetType {Synthetix_Synth, Lyra_LP} 
@@ -72,8 +72,6 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
     event ChangeTreasury(address oldTreasury, address newTreasury);
 
-    event SystemPaused(address indexed pausedBy);
-    event SystemUnpaused(address indexed unpausedBy);
     
 
     /**
@@ -86,12 +84,10 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         bool validUser = hasRole(ADMIN_ROLE, msg.sender) || hasRole(PAUSER_ROLE, msg.sender);
         require(validUser, "Caller is not able to call pause");
         _pause();
-        emit SystemPaused(msg.sender);
     }
     /// @notice sets state to unpaused only triggerable by admin
     function unpause() external onlyAdmin {
         _unpause();
-        emit SystemUnpaused(msg.sender);
     }
 
     /// @notice dailyMax can be set to 0 effectively preventing anyone from opening new loans.

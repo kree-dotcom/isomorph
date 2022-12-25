@@ -7,13 +7,14 @@ pragma abicoder v2;
 
 // External Lyra interface
 import "./helper/interfaces/ILiquidityPoolAvalon.sol";
+import "./helper/interfaces/IMultiDistributor.sol";
 
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
 
 contract Vault_Lyra is Vault_Base_ERC20{
-
+    
     constructor(
         address _isoUSD, //isoUSD address
         address _treasury, //treasury address
@@ -63,7 +64,24 @@ contract Vault_Lyra is Vault_Base_ERC20{
         ILiquidityPoolAvalon.LiquidityPoolParameters memory params = _liquidityPool.lpParams();
         return ( params.withdrawalFee );
     }
-    
+    /**
+        External admin only functions
+    */
+
+
+    function claimLyraRewards(address[] calldata _tokens, address distributor) onlyAdmin external{
+        IMultiDistributor(distributor).claim(_tokens);
+        uint256 length = _tokens.length;
+        for(uint256 i =0; i < length; i++){
+            require(!collateralBook.collateralValid(_tokens[i]), "Cannot withdraw collaterals");
+            IERC20 currentToken = IERC20(_tokens[i]);
+            uint256 amount = currentToken.balanceOf(address(this));
+            currentToken.transfer(msg.sender, amount);        
+        }
+        
+    }
+
+
 
     /**
         Public functions 

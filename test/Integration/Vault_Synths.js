@@ -1581,15 +1581,18 @@ describe("Integration tests: Vault Synths contract", function () {
           expect( await vault.hasRole(PAUSER, owner.address) ).to.equal(true);     
       });
   
-    it("Should enable admin role addresses to call pauser functions", async function() {
+    it("Should enable only admin role addresses to call pauser functions", async function() {
         const tx = await vault.connect(owner).proposeAddRole(addr1.address, ADMIN);
         const block = await ethers.provider.getBlock(tx.blockNumber);
         await expect(tx).to.emit(vault, 'QueueAddRole').withArgs(addr1.address, ADMIN, owner.address, block.timestamp);
         helpers.timeSkip(TIME_DELAY);
         await expect(vault.connect(owner).addRole(addr1.address, ADMIN)).to.emit(vault, 'AddRole').withArgs(addr1.address, ADMIN,  owner.address);
-        await expect(vault.connect(addr1).pause()).to.emit(vault, 'SystemPaused').withArgs(addr1.address);
+        await expect(vault.connect(addr1).pause()).to.emit(vault, 'Paused').withArgs(addr1.address);
+        await expect(vault.connect(addr2).pause()).to.be.revertedWith("Caller is not able to call pause")
         expect( await vault.hasRole(PAUSER, addr1.address) ).to.equal(false);
         expect( await vault.hasRole(ADMIN, addr1.address) ).to.equal(true);
+        await expect(vault.connect(addr2).unpause()).to.be.revertedWith("Caller is not an admin")
+        await expect(vault.connect(addr1).unpause()).to.emit(vault, 'Unpaused').withArgs(addr1.address);
     });
 
     it("should add a role that works if following correct procedure", async function() {
@@ -1598,7 +1601,7 @@ describe("Integration tests: Vault Synths contract", function () {
       expect( await vault.hasRole(PAUSER, addr2.address) ).to.equal(true);
       const tx = await vault.connect(addr2).pause();
       const block = await ethers.provider.getBlock(tx.blockNumber);
-      await expect(tx).to.emit(vault, 'SystemPaused').withArgs(addr2.address);
+      await expect(tx).to.emit(vault, 'Paused').withArgs(addr2.address);
     });
 
     it("should block non-role users calling role restricted functions", async function() {

@@ -1869,9 +1869,12 @@ describe("Integration tests: Vault_Velo contract", function () {
         await expect(tx).to.emit(vault, 'QueueAddRole').withArgs(alice.address, ADMIN, owner.address, block.timestamp);
         helpers.timeSkip(TIME_DELAY);
         await expect(vault.connect(owner).addRole(alice.address, ADMIN)).to.emit(vault, 'AddRole').withArgs(alice.address, ADMIN,  owner.address);
-        await expect(vault.connect(alice).pause()).to.emit(vault, 'SystemPaused').withArgs(alice.address);
+        await expect(vault.connect(alice).pause()).to.emit(vault, 'Paused').withArgs(alice.address);
+        await expect(vault.connect(bob).pause()).to.be.revertedWith("Caller is not able to call pause")
         expect( await vault.hasRole(PAUSER, alice.address) ).to.equal(false);
         expect( await vault.hasRole(ADMIN, alice.address) ).to.equal(true);
+        await expect(vault.connect(bob).unpause()).to.be.revertedWith("Caller is not an admin")
+        await expect(vault.connect(alice).unpause()).to.emit(vault, 'Unpaused').withArgs(alice.address);
     });
 
     it("should add a role that works if following correct procedure", async function() {
@@ -1880,7 +1883,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       expect( await vault.hasRole(PAUSER, bob.address) ).to.equal(true);
       const tx = await vault.connect(bob).pause();
       const block = await ethers.provider.getBlock(tx.blockNumber);
-      await expect(tx).to.emit(vault, 'SystemPaused').withArgs(bob.address);
+      await expect(tx).to.emit(vault, 'Paused').withArgs(bob.address);
     });
 
     it("should block non-role users calling role restricted functions", async function() {

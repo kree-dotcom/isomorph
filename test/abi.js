@@ -23,6 +23,12 @@ const ERC20 = [
   "event Transfer(address indexed from, address indexed to, uint amount)"
   ];
 
+  const LyraRewardsDistro = [
+    "function addToClaims(tuple(address user, uint256 amount)[], address token, uint256 epoch, string memory tag) external",
+    "function claimableBalances(address owner, address token) external view returns(uint256)",
+    "event Claimed(IERC20 rewardToken, address claimer, uint256 amount)"
+  ];
+  
   const LyraLP = [
     "function CBTimestamp() external view returns (uint256)",
     "function poolHedger() external view returns (address)",
@@ -89,6 +95,7 @@ const ERC20 = [
           ERC20: ERC20, 
           SynthSystem: SynthSystem, 
           LyraLP :LyraLP, 
+          LyraRewardsDistro: LyraRewardsDistro,
           GreekCache : GreekCache,
           OptionMarket : OptionMarket,
           Router : Router,
