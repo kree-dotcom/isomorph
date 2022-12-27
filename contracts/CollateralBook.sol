@@ -255,6 +255,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _virtualPriceUpdate,
         uint256 _updateTime
     ) external onlyVault collateralExists(_collateralAddress){
+        uint256 assetType = collateralProps[_collateralAddress].assetType;
+        require(vaults[assetType] == msg.sender, "Vaults can only update their own asset type");
         _updateVirtualPriceAndTime(_collateralAddress, _virtualPriceUpdate, _updateTime);
     }
 
