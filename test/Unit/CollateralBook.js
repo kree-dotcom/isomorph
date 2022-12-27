@@ -71,7 +71,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
         expect(collateralProps[6]).to.equal(SYNTH);
 
 
-        await collateralBook.queueCollateralChange(sUSDaddress, sBTCCode, sETHMinMargin, sETHLiqMargin, sETHInterest, SYNTH, sETHaddress);
+        await collateralBook.queueCollateralChange(sUSDaddress, sBTCCode, sETHMinMargin, sETHLiqMargin, sETHInterest, sETHaddress);
         const timeToSkip = await collateralBook.CHANGE_COLLATERAL_DELAY();
         await helpers.timeSkip(timeToSkip.toNumber());
         await collateralBook.changeCollateralType();
@@ -100,7 +100,7 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
     it("Should only allow owner to call functions", async function () {
       await expect(collateralBook.connect(addr2).addCollateralType(sBTCaddress, sBTCCode, validOpenMargin, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.revertedWith("Caller is not an admin");
       await expect(collateralBook.connect(addr2).changeCollateralType()).to.be.revertedWith("Caller is not an admin");
-      await expect(collateralBook.connect(addr2).queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.revertedWith("Caller is not an admin");
+      await expect(collateralBook.connect(addr2).queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, ZERO_ADDRESS)).to.be.revertedWith("Caller is not an admin");
       await expect(collateralBook.connect(addr2).pauseCollateralType(sETHaddress, sETHCode)).to.be.revertedWith("Caller is not an admin");
       await expect(collateralBook.connect(addr2).unpauseCollateralType(sETHaddress, sETHCode)).to.be.revertedWith("Caller is not an admin");
       await expect(collateralBook.connect(addr2).addVaultAddress(sETHaddress, SYNTH)).to.be.revertedWith("Caller is not an admin");
@@ -181,23 +181,23 @@ const e18 = ethers.utils.parseEther("1.0"); //1 ether, used for 10^18 scale math
     });
 
     it("Should fail to modify nonexistent collateral token", async function () {
-      await expect(collateralBook.queueCollateralChange(sBTCaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.revertedWith("Unsupported collateral!");
+      await expect(collateralBook.queueCollateralChange(sBTCaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, ZERO_ADDRESS)).to.be.revertedWith("Unsupported collateral!");
     });
 
     it("Should fail to trigger a collateral change before deadline or queuing", async function () {
       await expect(collateralBook.changeCollateralType()).to.be.revertedWith("Uninitialized collateral change");
-      await collateralBook.queueCollateralChange(sUSDaddress, sBTCCode, sETHMinMargin, sETHLiqMargin, sETHInterest, SYNTH, sETHaddress);
+      await collateralBook.queueCollateralChange(sUSDaddress, sBTCCode, sETHMinMargin, sETHLiqMargin, sETHInterest, sETHaddress);
       const timeToSkip = await collateralBook.CHANGE_COLLATERAL_DELAY();
       await helpers.timeSkip(timeToSkip.toNumber() - 10);
       await expect(collateralBook.changeCollateralType()).to.be.revertedWith("Not enough time passed");
     });
 
     it("Should fail to modify with incorrect params", async function () {
-      await expect(collateralBook.queueCollateralChange(ZERO_ADDRESS, sETHCode, validOpenMargin, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.revertedWith("Unsupported collateral!");
-      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, 10, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.reverted;
-      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, 0, validInterest, SYNTH, ZERO_ADDRESS)).to.be.reverted;
-      await expect(collateralBook.queueCollateralChange(sBTCaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.reverted;
-      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, invalidLiqMargin, validInterest, SYNTH, ZERO_ADDRESS)).to.be.revertedWith("Liquidation ratio too low");
+      await expect(collateralBook.queueCollateralChange(ZERO_ADDRESS, sETHCode, validOpenMargin, validLiqMargin, validInterest, ZERO_ADDRESS)).to.be.revertedWith("Unsupported collateral!");
+      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, 10, validLiqMargin, validInterest, ZERO_ADDRESS)).to.be.reverted;
+      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, 0, validInterest, ZERO_ADDRESS)).to.be.reverted;
+      await expect(collateralBook.queueCollateralChange(sBTCaddress, sETHCode, validOpenMargin, validLiqMargin, validInterest, ZERO_ADDRESS)).to.be.reverted;
+      await expect(collateralBook.queueCollateralChange(sETHaddress, sETHCode, validOpenMargin, invalidLiqMargin, validInterest, ZERO_ADDRESS)).to.be.revertedWith("Liquidation ratio too low");
     });
 
     it("Should allow multiple vaults to be added", async function () {

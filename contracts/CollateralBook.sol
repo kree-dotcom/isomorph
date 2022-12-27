@@ -98,7 +98,6 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _minimumRatio,
         uint256 _liquidationRatio,
         uint256 _interestPer3Min,
-        uint256 _assetType,
         address _liquidityPool
 
     ) external onlyAdmin collateralExists(_collateralAddress) {
@@ -106,9 +105,9 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
-        require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1 otherwise it could decrease
-        require(vaults[_assetType] != address(0), "Vault not deployed yet");
-        IVault vault = IVault(vaults[_assetType]);
+        require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1e18 otherwise it could decrease
+        uint256 assetType = collateralProps[_collateralAddress].assetType;
+        IVault vault = IVault(vaults[assetType]);
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
         require( vault.LIQUIDATION_RETURN() *_liquidationRatio > 10 ** 36, "Liquidation ratio too low");
 
