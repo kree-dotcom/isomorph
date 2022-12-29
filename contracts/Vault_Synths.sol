@@ -15,6 +15,10 @@ import "./helper/interfaces/ISystemStatus.sol";
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
+//chainlink aggregator interface for pricefeed
+import "./interfaces/IAggregatorV3.sol";
+import "./interfaces/IAccessControlledOffchainAggregator.sol";
+
 
 contract Vault_Synths is Vault_Base_ERC20 {
     
@@ -23,16 +27,20 @@ contract Vault_Synths is Vault_Base_ERC20 {
     bytes32 private constant EXCHANGE_RATES = "ExchangeRates";
     bytes32 private constant EXCHANGER = "Exchanger";
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
+    uint256 private constant HEARTBEAT = 24 hours; //sUSD Chainlink Optimism heartbeat time
+    uint256 private constant ORACLE_BASE = 1e8; // ten to the power of the number of decimals given to the price feed
     
     //Optimism Mainnet addresses
     
-    //address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
     address public constant ADDRESS_RESOLVER = 0x95A6a3f44a70172E7d50a9e28c85Dfd712756B8C;
     IAddressResolver addressResolver = IAddressResolver(ADDRESS_RESOLVER);
+
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
-    
-    //IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
     ISystemStatus private synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);
+
+    address public constant PRICE_FEED = 0x7f99817d87baD03ea21E05112Ca799d715730efe;
+    IAggregatorV3 priceFeed = IAggregatorV3(PRICE_FEED);
+    
    
     
     
@@ -44,6 +52,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         require(_isoUSD != address(0), "Zero Address used isoUSD");
         require(_treasury != address(0), "Zero Address used Treasury");
         require(_collateralBook != address(0), "Zero Address used Collateral");
+
         isoUSD = IisoUSDToken(_isoUSD);
         treasury = _treasury;
         collateralBook = ICollateralBook(_collateralBook);
@@ -72,6 +81,30 @@ contract Vault_Synths is Vault_Base_ERC20 {
         Public functions 
     */
 
+    function getOraclePrice() public view returns (uint256 ) {
+        (
+            uint80 roundID,
+            int signedPrice,
+            /*uint startedAt*/,
+            uint timeStamp,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+        //check for Chainlink oracle deviancies, force a revert if any are present. Helps prevent a LUNA like issue
+        require(signedPrice > 0, "Negative Oracle Price");
+        require(timeStamp >= block.timestamp - HEARTBEAT , "Stale pricefeed");
+        IAccessControlledOffchainAggregator  aggregator = IAccessControlledOffchainAggregator(priceFeed.aggregator());
+        //fetch the pricefeeds hard limits so we can be aware if these have been reached.
+        int192 tokenMinPrice = aggregator.minAnswer();
+        int192 tokenMaxPrice = aggregator.maxAnswer();
+        //The min/maxPrice is the smallest/largest value the aggregator will post and so if it is reached we can no longer trust the oracle price hasn't gone beyond it.
+        require(signedPrice < tokenMaxPrice, "Upper price bound breached"); 
+        require(signedPrice > tokenMinPrice, "Lower price bound breached");
+        require(answeredInRound >= roundID, "round not complete");
+        uint256 price = uint256(signedPrice);
+        return price;
+
+
+    }
 
     //isoUSD is assumed to be valued at $1 by all of the system to avoid oracle attacks. 
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
@@ -84,7 +117,9 @@ contract Vault_Synths is Vault_Base_ERC20 {
         uint256 exchangeAmount = exchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE);
         uint256 fee = exchanger.feeRateForExchange(_currencyKey, SUSD_CODE);
         uint256 exchangeAmountAfterFee = (exchangeAmount * (LOAN_SCALE - fee))/LOAN_SCALE;
-        return (exchangeAmountAfterFee);      
+        uint256 oraclePrice = getOraclePrice();
+        uint256 USDValue = (exchangeAmountAfterFee*oraclePrice) / ORACLE_BASE;
+        return (USDValue);      
     }
 
     /**

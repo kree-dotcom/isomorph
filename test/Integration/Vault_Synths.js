@@ -82,7 +82,7 @@ async function cycleVirtualPrice(steps, collateral) {
 }
 
 
-describe("Integration tests: Vault Synths contract", function () {
+describe.only("Integration tests: Vault Synths contract", function () {
   
 
   let owner; //0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266
@@ -110,12 +110,14 @@ describe("Integration tests: Vault Synths contract", function () {
   const sUSDDoner = addresses.optimism.sUSD_Doner
   const SETHDoner = addresses.optimism.sETH_Doner
   const addressResolver_address = addresses.optimism.Address_Resolver
+  const price_feed_address = addresses.optimism.Chainlink_SUSD_Feed
   
   const provider = ethers.provider;
 
   const sUSD = new ethers.Contract(sUSDaddr, ABIs.ERC20, provider);
   const sETH = new ethers.Contract(sETHaddr, ABIs.ERC20, provider);
   const sBTC = new ethers.Contract(sBTCaddr, ABIs.ERC20, provider);
+  price_feed = new ethers.Contract(price_feed_address, ABIs.PriceFeed, provider)
   //Synthetix contracts we sset up later
   let exchangeRates
   let exchanger
@@ -225,7 +227,8 @@ describe("Integration tests: Vault Synths contract", function () {
   describe("Construction", function (){
     it("Should deploy the right Synthetix external contract addresses", async function (){
       const SYSTEM_STATUS = addresses.optimism.System_Status;
-      //expect( await vault.EXCHANGE_RATES()).to.equal(EXCHANGE_RATES);
+      const ADDRESS_RESOLVER = addresses.optimism.Address_Resolver;
+      expect( await vault.ADDRESS_RESOLVER()).to.equal(ADDRESS_RESOLVER);
       expect( await vault.SYSTEM_STATUS()).to.equal(SYSTEM_STATUS);
     });
   });
@@ -490,19 +493,22 @@ describe("Integration tests: Vault Synths contract", function () {
     });
 
     it("Should fail to open a loan if MinOpeningMargin is not met due to Synthetix exchange fees ", async function () {
+      const ORACLE_BASE = 10**8
       await impersonateForToken(provider, addr1, sETH, SETHDoner, collateralUsed)
-
       let collateralValue = await exchangeRates.effectiveValue(sETHCode, collateralUsed, sUSDCode);
+      let latest_round_SUSD = await (price_feed.latestRoundData())
+      let oracleRate = latest_round_SUSD[1]
+      let collateralUSDValue = collateralValue.mul(oracleRate).div(ORACLE_BASE)
       let fee = await exchanger.feeRateForExchange(sETHCode, sUSDCode);
 
       const sETHMinMargin = (await collateralBook.collateralProps(sETH.address))[1]
-      let unsafeLoanAmount = collateralValue.div(sETHMinMargin).mul(base)
+      let unsafeLoanAmount = collateralUSDValue.div(sETHMinMargin).mul(base)
 
       await sETH.connect(addr1).approve(vault.address, collateralUsed);
       await expect(vault.connect(addr1).openLoan(sETH.address, collateralUsed, unsafeLoanAmount)).to.be.revertedWith("Minimum margin not met!")
       
       //but if we adjust for exchange fee the loan should succeed
-      let safeLoanAmount = (collateralValue.mul(base.sub(fee)).div(base)).div(sETHMinMargin).mul(base)
+      let safeLoanAmount = (collateralUSDValue.mul(base.sub(fee)).div(base)).div(sETHMinMargin).mul(base)
       await vault.connect(addr1).openLoan(sETH.address, collateralUsed, safeLoanAmount)
     });
     
@@ -638,7 +644,7 @@ describe("Integration tests: Vault Synths contract", function () {
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
       const beforeTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       //we request a loan that places us slightly over the maximum loan allowed
-      const loanIncrease = ethers.utils.parseEther('354');
+      const loanIncrease = ethers.utils.parseEther('367');
       //let virtualPrice = await collateralBook.viewVirtualPriceforAsset(sUSD.address);
       await expect(vault.connect(addr1).openLoan(sUSD.address,0, loanIncrease)).to.be.revertedWith("Minimum margin not met!");
       
@@ -1496,18 +1502,24 @@ describe("Integration tests: Vault Synths contract", function () {
 
     it("Should correctly price Synth swaps to sUSD", async function () {
       let amount = ethers.utils.parseEther("1000");
+      const ORACLE_BASE = 10**8
       let expectedUSD = await vault.priceCollateralToUSD(sETHCode , amount)
       let exchangeAmount = await exchangeRates.effectiveValue(sETHCode, amount, sUSDCode);
       let fee = await exchanger.feeRateForExchange(sETHCode, sUSDCode);
       let exchangeAmountAfterFee = exchangeAmount.mul(base.sub(fee)).div(base)
-      expect(expectedUSD).to.equal(exchangeAmountAfterFee)
+      let latest_round_SUSD = await (price_feed.latestRoundData())
+      let oracleRate = latest_round_SUSD[1]
+      let USDValue = exchangeAmountAfterFee.mul(oracleRate).div(ORACLE_BASE)
+
+      expect(expectedUSD).to.equal(USDValue)
 
       let amount_2 = ethers.utils.parseEther("569");
       let expectedUSD_2 = await vault.priceCollateralToUSD(sBTCCode , amount_2)
       let exchangeAmount_2 = await exchangeRates.effectiveValue(sBTCCode, amount_2, sUSDCode);
       let fee_2 = await exchanger.feeRateForExchange(sBTCCode, sUSDCode);
       let exchangeAmountAfterFee_2 = exchangeAmount_2.mul(base.sub(fee_2)).div(base)
-      expect(expectedUSD_2).to.equal(exchangeAmountAfterFee_2)
+      let USDValue_2 = exchangeAmountAfterFee_2.mul(oracleRate).div(ORACLE_BASE)
+      expect(expectedUSD_2).to.equal(USDValue_2)
     });      
   
     

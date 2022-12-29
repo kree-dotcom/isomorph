@@ -145,7 +145,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         else{
             dailyTotal += _amountAdded;
         }
-        require( dailyTotal  < dailyMax, "Try again tomorrow loan opening limit hit");
+        require( dailyTotal  <= dailyMax, "Try again tomorrow loan opening limit hit");
     }
     
     /// @notice basic checks to verify collateral being used exists
@@ -187,7 +187,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @return feeToPay is the percentToPay of original _amount.
     function _findFees(uint256 _percentToPay, uint256 _amount) internal pure returns(uint256, uint256){
         uint256 feeToPay = ((_amount * _percentToPay) / LOAN_SCALE);
-        uint256 postFees = _amount - feeToPay; //if the user loan is too small this will revert
+        uint256 postFees = _amount - feeToPay; 
         return (postFees, feeToPay);
     }
 
