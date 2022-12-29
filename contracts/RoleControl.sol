@@ -56,8 +56,8 @@ contract RoleControl is AccessControl{
         emit AddRole(_account, _role,  msg.sender);
     }
 
-    // @param _minter address that is already a minter and you wish to remove from this role.
-    // @notice reverts if address `_minter` did not already have the minter role.
+    // @param _account address that is already a minter and you wish to remove from this role.
+    // @notice reverts if address `_account` did not already have the specified role.
     function removeRole(address _account, bytes32 _role) external onlyAdmin{
         require(hasRole(_role, _account), "Address was not already specified role");
         _revokeRole(_role, _account);
