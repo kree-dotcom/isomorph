@@ -82,7 +82,7 @@ async function cycleVirtualPrice(steps, collateral) {
 }
 
 
-describe.only("Integration tests: Vault Synths contract", function () {
+describe("Integration tests: Vault Synths contract", function () {
   
 
   let owner; //0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266

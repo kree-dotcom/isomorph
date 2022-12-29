@@ -188,10 +188,6 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         address _collateralAddress,
         bytes32 _currencyKey
         ) external collateralExists(_collateralAddress) onlyAdmin {
-        require(_collateralAddress != address(0)); //this should get caught by the collateralExists check but just to be careful
-        uint256 timeDelta = block.timestamp - collateralProps[_collateralAddress].lastUpdateTime;
-        uint256 threeMinDelta = timeDelta / THREE_MIN;
-        require(threeMinDelta == 0, "Must update virtualPrice first");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
         collateralPaused[_collateralAddress] = true;
@@ -208,14 +204,11 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
     function unpauseCollateralType(
         address _collateralAddress,
         bytes32 _currencyKey
-        ) external onlyAdmin {
-        require(_collateralAddress != address(0));
+        ) external collateralExists(_collateralAddress) onlyAdmin {
         require(collateralPaused[_collateralAddress], "Unsupported collateral or not Paused");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
         collateralPaused[_collateralAddress] = false;
-        //update collateral update time so users are not charged interest for the time period on which the collateral was paused.
-        _updateVirtualPriceAndTime(_collateralAddress, collateralProps[_collateralAddress].virtualPrice ,block.timestamp);
         
     }
     /// @dev Governnance callable only, this should be set once atomically on construction 
