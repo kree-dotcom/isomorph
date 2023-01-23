@@ -12,8 +12,8 @@ require('dotenv').config()
  */
  
 module.exports = {
-  solidity: "0.8.9",
-  
+  solidity: {
+  version: "0.8.9",
   settings: {
 	optimizer : {
 		enabled: true,
@@ -22,16 +22,19 @@ module.exports = {
 			yul: true, 
 			yulDetails: {
 				stackAllocation: true,
-			}
-		}
-	}
-  },
+				    }
+			 }
+		    },
+            }
+            },
   networks: {
 	hardhat: {
 		forking: {
 		  url: process.env.OPTIMISM_MAINNET_API_AND_KEY,
-		  blockNumber: 29617000 //16th oct 2022
-		}
+		  blockNumber: 29617000, //16th oct 2022
+		  
+		},
+		//allowUnlimitedContractSize: true,
 	  },
   	kovan: {
   		url: process.env.KOVAN_API_AND_KEY,

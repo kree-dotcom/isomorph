@@ -20,7 +20,7 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
 
     uint256 public constant THREE_MIN = 180;
     uint256 public constant DIVISION_BASE = 1 ether;
-    uint256 public constant CHANGE_COLLATERAL_DELAY = 200; //2 days
+    uint256 public constant CHANGE_COLLATERAL_DELAY = 2 days;
 
     //temporary data stores for changing Collateral variables
     address queuedCollateralAddress;
@@ -98,17 +98,18 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _minimumRatio,
         uint256 _liquidationRatio,
         uint256 _interestPer3Min,
-        uint256 _assetType,
         address _liquidityPool
 
-    ) external collateralExists(_collateralAddress) onlyAdmin {
+    ) external onlyAdmin collateralExists(_collateralAddress) {
+        
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio != 0);
-        require(vaults[_assetType] != address(0), "Vault not deployed yet");
-        IVault vault = IVault(vaults[_assetType]);
+        require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1e18 otherwise it could decrease
+        uint256 assetType = collateralProps[_collateralAddress].assetType;
+        IVault vault = IVault(vaults[assetType]);
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
-        require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low");
+        require( vault.LIQUIDATION_RETURN() *_liquidationRatio > 10 ** 36, "Liquidation ratio too low");
 
         queuedCollateralAddress = _collateralAddress;
         queuedCurrencyKey = _currencyKey;
@@ -182,15 +183,16 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
   /// @param _collateralAddress the token address of the collateral we wish to remove
   /// @param _currencyKey the related synthcode, here we use this to prevent accidentally pausing the wrong collateral token.
   /// @dev this should only be called on collateral no longer used by loans.
+  /// @dev This function can only be called if the collateral has been updated within 3min by calling updateVirtualPriceSlowly()
     function pauseCollateralType(
         address _collateralAddress,
         bytes32 _currencyKey
         ) external collateralExists(_collateralAddress) onlyAdmin {
-        require(_collateralAddress != address(0)); //this should get caught by the collateralExists check but just to be careful
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
-        collateralValid[_collateralAddress] = false;
         collateralPaused[_collateralAddress] = true;
+        
+
         
     }
 
@@ -198,15 +200,14 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
   /// @param _collateralAddress the token address of the collateral we wish to remove
   /// @param _currencyKey the related synthcode, here we use this to prevent accidentally unpausing the wrong collateral token.
   /// @dev this should only be called on collateral that should be reenabled for taking loans against
+  /// @dev while a collateral is paused we charge no interest on it, so we update the timestamp to the current time to enforce this.
     function unpauseCollateralType(
         address _collateralAddress,
         bytes32 _currencyKey
-        ) external onlyAdmin {
-        require(_collateralAddress != address(0));
+        ) external collateralExists(_collateralAddress) onlyAdmin {
         require(collateralPaused[_collateralAddress], "Unsupported collateral or not Paused");
         //checks two inputs to help prevent input mistakes
         require( _currencyKey == collateralProps[_collateralAddress].currencyKey, "Mismatched data");
-        collateralValid[_collateralAddress] = true;
         collateralPaused[_collateralAddress] = false;
         
     }
@@ -234,8 +235,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _updateTime
         ) internal  {
 
-        require( collateralProps[_collateralAddress].virtualPrice < _virtualPriceUpdate, "Incorrect virtual price" );
-        require( collateralProps[_collateralAddress].lastUpdateTime < _updateTime, "Incorrect timestamp" );
+        require( collateralProps[_collateralAddress].virtualPrice <= _virtualPriceUpdate, "Incorrect virtual price" );
+        require( collateralProps[_collateralAddress].lastUpdateTime <= _updateTime, "Incorrect timestamp" );
         collateralProps[_collateralAddress].virtualPrice = _virtualPriceUpdate;
         collateralProps[_collateralAddress].lastUpdateTime = _updateTime;
     }
@@ -247,6 +248,8 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         uint256 _virtualPriceUpdate,
         uint256 _updateTime
     ) external onlyVault collateralExists(_collateralAddress){
+        uint256 assetType = collateralProps[_collateralAddress].assetType;
+        require(vaults[assetType] == msg.sender, "Vaults can only update their own asset type");
         _updateVirtualPriceAndTime(_collateralAddress, _virtualPriceUpdate, _updateTime);
     }
 
@@ -262,7 +265,6 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
             Collateral memory collateral = collateralProps[_collateralAddress];
             uint256 timeDelta = block.timestamp - collateral.lastUpdateTime;
             uint256 threeMinDelta = timeDelta / THREE_MIN;
-    
             require(_cycles <= threeMinDelta, 'Cycle count too high');
                 for (uint256 i = 0; i < _cycles; i++ ){
                     collateral.virtualPrice = (collateral.virtualPrice * collateral.interestPer3Min) / DIVISION_BASE; 
@@ -296,15 +298,16 @@ contract CollateralBook is RoleControl(COLLATERAL_BOOK_TIME_DELAY){
         ) external onlyAdmin {
 
         require(!collateralValid[_collateralAddress], "Collateral already exists");
-        require(!collateralPaused[_collateralAddress], "Collateral already exists");
         require(_collateralAddress != address(0));
         require(_minimumRatio > _liquidationRatio);
         require(_liquidationRatio > 0);
+        require(_interestPer3Min >= DIVISION_BASE); //interest must always be >= 1 otherwise it could decrease
         require(vaults[_assetType] != address(0), "Vault not deployed yet");
+        require(liquidityPoolOf[_currencyKey] == address(0), "CurrencyKey already in use");
         IVault vault = IVault(vaults[_assetType]);
 
         //prevent setting liquidationRatio too low such that it would cause an overflow in callLiquidation, see appendix on liquidation maths for details.
-        require( vault.LIQUIDATION_RETURN() *_liquidationRatio >= 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
+        require( vault.LIQUIDATION_RETURN() *_liquidationRatio > 10 ** 36, "Liquidation ratio too low"); //i.e. 1 when multiplying two 1 ether scale numbers.
         collateralValid[_collateralAddress] = true;
         collateralProps[_collateralAddress] = Collateral(
             _currencyKey,

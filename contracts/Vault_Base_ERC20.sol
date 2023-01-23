@@ -16,6 +16,8 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 //Time delayed governance
 import "./RoleControl.sol";
 
+
+
 uint256 constant VAULT_TIME_DELAY = 3 days;
 
 abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
@@ -30,14 +32,18 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     //this records loan amounts requested and grows by interest accrued
     //collateral address => user address => total loan and interest owed
     mapping(address => mapping(address => uint256)) public isoUSDLoanAndInterest;
+    //The max isoUSD allowed to be loaned per collateral, allowing a cap to be set 
+    mapping(address => uint256) public maxLoansPerCollateral;
+    //The current total open isoUSD loans per collateral.
+    mapping(address => uint256) public currentTotalLoansPerCollateral;
 
     //variables relating to access control and setting new roles
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 internal constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
-    uint256 public constant LOAN_SCALE = 1 ether; //base for division/decimal maths
-    uint256 public constant TENTH_OF_CENT = 1 ether /1000; //$0.001
+    uint256 internal constant LOAN_SCALE = 1 ether; //base for division/decimal maths
+    uint256 internal constant THREE_MIN = 180;
 
     //Enums// collateral type identifiers to revert if the wrong collateral is interacted with by the wrong Vault.
     enum AssetType {Synthetix_Synth, Lyra_LP} 
@@ -69,11 +75,10 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     event Liquidation(address indexed loanHolder, address indexed Liquidator, uint256 loanAmountReturned, bytes32 indexed collateralToken, uint256 liquidatedCapital);
     event BadDebtCleared(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
+    event ChangeCollateralMax(uint256 newMax, uint256 oldMax, address collateral);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
     event ChangeTreasury(address oldTreasury, address newTreasury);
 
-    event SystemPaused(address indexed pausedBy);
-    event SystemUnpaused(address indexed unpausedBy);
     
 
     /**
@@ -86,12 +91,10 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         bool validUser = hasRole(ADMIN_ROLE, msg.sender) || hasRole(PAUSER_ROLE, msg.sender);
         require(validUser, "Caller is not able to call pause");
         _pause();
-        emit SystemPaused(msg.sender);
     }
     /// @notice sets state to unpaused only triggerable by admin
     function unpause() external onlyAdmin {
         _unpause();
-        emit SystemUnpaused(msg.sender);
     }
 
     /// @notice dailyMax can be set to 0 effectively preventing anyone from opening new loans.
@@ -99,6 +102,16 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_newDailyMax < 100_000_000 ether ); //sanity check, require less than 100 million opened per day
         emit ChangeDailyMax(_newDailyMax, dailyMax); //ignoring CEI pattern here
         dailyMax = _newDailyMax;
+        
+        
+    }
+
+    /// @notice MaxLoanPerCollateral can be set to 0 effectively preventing anyone from opening new loans.
+    /// @dev Use this limit to finetune the maxmimum loan allowed for more risky collaterals, i.e. ones with less liquidity available for liquidations 
+    function setMaxLoansPerCollateral(uint256 _newMax, address _collateralAddress) external onlyAdmin {
+        require(_newMax < 100_000_000 ether ); //sanity check, require less than 100 million max per collateral
+        emit ChangeCollateralMax(_newMax, maxLoansPerCollateral[_collateralAddress], _collateralAddress ); //ignoring CEI pattern here
+        maxLoansPerCollateral[_collateralAddress] = _newMax;
         
         
     }
@@ -149,7 +162,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         else{
             dailyTotal += _amountAdded;
         }
-        require( dailyTotal  < dailyMax, "Try again tomorrow loan opening limit hit");
+        require( dailyTotal  <= dailyMax, "Try again tomorrow loan opening limit hit");
     }
     
     /// @notice basic checks to verify collateral being used exists
@@ -191,7 +204,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @return feeToPay is the percentToPay of original _amount.
     function _findFees(uint256 _percentToPay, uint256 _amount) internal pure returns(uint256, uint256){
         uint256 feeToPay = ((_amount * _percentToPay) / LOAN_SCALE);
-        uint256 postFees = _amount - feeToPay; //if the user loan is too small this will revert
+        uint256 postFees = _amount - feeToPay; 
         return (postFees, feeToPay);
     }
 
@@ -211,12 +224,12 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         ) = _getCollateral(_collateralAddress);
         uint256 timeDelta = _currentBlockTime - lastUpdateTime;
         //exit gracefully if two users call the function for the same collateral in the same 3min period
-        uint256 threeMinuteDelta = timeDelta / 180; 
+        uint256 threeMinuteDelta = timeDelta / THREE_MIN; 
         if(threeMinuteDelta > 0) {
             for (uint256 i = 0; i < threeMinuteDelta; i++ ){
             virtualPrice = (virtualPrice * interestPer3Min) / LOAN_SCALE; 
             }
-            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, _currentBlockTime);
+            collateralBook.vaultUpdateVirtualPriceAndTime(_collateralAddress, virtualPrice, lastUpdateTime + threeMinuteDelta*THREE_MIN);
         }
     }
     
@@ -226,11 +239,18 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
       * @dev internal function to handle increases of loan
       * @param _loanAmount amount of isoUSD to be borrowed, some is used to pay the opening fee the rest is sent to the user.
      **/
-    function _increaseLoan(uint256 _loanAmount) internal {
+    function _increaseLoan(uint256 _loanAmount, address _collateralAddress) internal {
         uint256 userMint;
         uint256 loanFee;
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
+        //check the user loan doesn't exceed the current collateral's loan cap
+        currentTotalLoansPerCollateral[_collateralAddress] += _loanAmount;
+        require(
+            currentTotalLoansPerCollateral[_collateralAddress] <= maxLoansPerCollateral[_collateralAddress],
+            "Collateral reached max loans"
+            );
+
         isoUSD.mint(_loanAmount);
         //isoUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
         //slither-disable-next-line unchecked-transfer
@@ -260,8 +280,9 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         uint256 USDBurning = _USDReturned - _interestPaid;
         //slither-disable-next-line unchecked-transfer
         isoUSD.transferFrom(msg.sender, address(this), _USDReturned);
-        //burn original loan principle
+        //burn original loan principle and reduce total current loans for this collateral
         isoUSD.burn(address(this), USDBurning);
+        currentTotalLoansPerCollateral[_collateralAddress] -= USDBurning;
         //transfer interest earned on loan to treasury
         //slither-disable-next-line unchecked-transfer
         isoUSD.transfer(treasury, _interestPaid);

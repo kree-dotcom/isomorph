@@ -8,27 +8,40 @@ pragma abicoder v2;
 // External Synthetix interfaces
 import "./helper/interfaces/ISynthetix.sol";
 import "./helper/interfaces/IExchangeRates.sol";
+import "./helper/interfaces/IAddressResolver.sol";
+import "./helper/interfaces/IExchanger.sol";
 import "./helper/interfaces/ISystemStatus.sol";
 
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
+
+//chainlink aggregator interface for pricefeed
+import "./interfaces/IAggregatorV3.sol";
+import "./interfaces/IAccessControlledOffchainAggregator.sol";
+
 
 
 contract Vault_Synths is Vault_Base_ERC20 {
     
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
+    bytes32 private constant EXCHANGE_RATES = "ExchangeRates";
+    bytes32 private constant EXCHANGER = "Exchanger";
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
+    uint256 internal HEARTBEAT = 24 hours; //sUSD Chainlink Optimism heartbeat time, not a constant for testing purposes
+    uint256 private constant ORACLE_BASE = 1e8; // ten to the power of the number of decimals given to the price feed
     
     //Optimism Mainnet addresses
     
-    address public constant EXCHANGE_RATES = 0x22602469d704BfFb0936c7A7cfcD18f7aA269375;
-    address public constant PROXY_ERC20 = 0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4;
-    address public constant SUSD_ADDR = 0x8c6f28f2F1A3C87F0f938b96d27520d9751ec8d9;
+    address public constant ADDRESS_RESOLVER = 0x95A6a3f44a70172E7d50a9e28c85Dfd712756B8C;
+    IAddressResolver addressResolver = IAddressResolver(ADDRESS_RESOLVER);
+
     address public constant SYSTEM_STATUS = 0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD;
-    
-    IExchangeRates private synthetixExchangeRates = IExchangeRates(EXCHANGE_RATES);
     ISystemStatus private synthetixSystemStatus = ISystemStatus(SYSTEM_STATUS);
+
+    address public constant PRICE_FEED = 0x7f99817d87baD03ea21E05112Ca799d715730efe;
+    IAggregatorV3 priceFeed = IAggregatorV3(PRICE_FEED);
+    
    
     
     
@@ -40,6 +53,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         require(_isoUSD != address(0), "Zero Address used isoUSD");
         require(_treasury != address(0), "Zero Address used Treasury");
         require(_collateralBook != address(0), "Zero Address used Collateral");
+
         isoUSD = IisoUSDToken(_isoUSD);
         treasury = _treasury;
         collateralBook = ICollateralBook(_collateralBook);
@@ -68,14 +82,45 @@ contract Vault_Synths is Vault_Base_ERC20 {
         Public functions 
     */
 
+    function getOraclePrice() public view returns (uint256 ) {
+        (
+            uint80 roundID,
+            int signedPrice,
+            /*uint startedAt*/,
+            uint timeStamp,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+        //check for Chainlink oracle deviancies, force a revert if any are present. Helps prevent a LUNA like issue
+        require(signedPrice > 0, "Negative Oracle Price");
+        require(timeStamp >= block.timestamp - HEARTBEAT , "Stale pricefeed");
+        IAccessControlledOffchainAggregator  aggregator = IAccessControlledOffchainAggregator(priceFeed.aggregator());
+        //fetch the pricefeeds hard limits so we can be aware if these have been reached.
+        int192 tokenMinPrice = aggregator.minAnswer();
+        int192 tokenMaxPrice = aggregator.maxAnswer();
+        //The min/maxPrice is the smallest/largest value the aggregator will post and so if it is reached we can no longer trust the oracle price hasn't gone beyond it.
+        require(signedPrice < tokenMaxPrice, "Upper price bound breached"); 
+        require(signedPrice > tokenMinPrice, "Lower price bound breached");
+        require(answeredInRound >= roundID, "round not complete");
+        uint256 price = uint256(signedPrice);
+        return price;
+
+
+    }
 
     //isoUSD is assumed to be valued at $1 by all of the system to avoid oracle attacks. 
     /// @param _currencyKey code used by Synthetix to identify each collateral/synth
     /// @param _amount quantity of collateral to price into sUSD
-    /// @return returns the value of the given synth in sUSD which is assumed to be pegged at $1.
+    /// @return returns the value of the given synth in sUSD after Synthetix exchange fees.
     function priceCollateralToUSD(bytes32 _currencyKey, uint256 _amount) public view override returns(uint256){
-        //As it is a synth use synthetix for pricing
-        return (synthetixExchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE));      
+        //As it is a synth use synthetix for pricing, we fetch the Synthetix pricing contracts each time as they occasionally are updated.
+        IExchanger exchanger = IExchanger(addressResolver.getAddress(EXCHANGER));
+        IExchangeRates exchangeRates = IExchangeRates(addressResolver.getAddress(EXCHANGE_RATES));
+        uint256 exchangeAmount = exchangeRates.effectiveValue(_currencyKey, _amount, SUSD_CODE);
+        uint256 fee = exchanger.feeRateForExchange(_currencyKey, SUSD_CODE);
+        uint256 exchangeAmountAfterFee = (exchangeAmount * (LOAN_SCALE - fee))/LOAN_SCALE;
+        uint256 oraclePrice = getOraclePrice();
+        uint256 USDValue = (exchangeAmountAfterFee*oraclePrice) / ORACLE_BASE;
+        return (USDValue);      
     }
 
     /**
@@ -97,6 +142,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         ) external override whenNotPaused 
         {
         _collateralExists(_collateralAddress);
+        require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
         IERC20 collateral = IERC20(_collateralAddress);
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
         //make sure virtual price is related to current time before fetching collateral details
@@ -117,7 +163,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
 
         //make sure the total isoUSD borrowed doesn't exceed the opening borrow margin ratio
         uint256 colInUSD = priceCollateralToUSD(currencyKey, _colAmount + collateralPosted[_collateralAddress][msg.sender]);
-        uint256 totalUSDborrowed = _USDborrowed +  (isoUSDLoaned[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
+        uint256 totalUSDborrowed = _USDborrowed +  (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice)/LOAN_SCALE;
         require(totalUSDborrowed >= ONE_HUNDRED_DOLLARS, "Loan Requested too small"); 
         uint256 borrowMargin = (totalUSDborrowed * minOpeningMargin) / LOAN_SCALE;
         require(colInUSD >= borrowMargin, "Minimum margin not met!");
@@ -131,7 +177,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
 
         //Now all effects are handled, transfer the assets so we follow CEI pattern
         _increaseCollateral(collateral, _colAmount);
-        _increaseLoan(_USDborrowed);
+        _increaseLoan(_USDborrowed, _collateralAddress);
         
         
     }
@@ -147,7 +193,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external override whenNotPaused 
+        ) external override
         {
         _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
@@ -168,13 +214,6 @@ contract Vault_Synths is Vault_Base_ERC20 {
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey);
-        //debatable check begins here 
-        uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat);
-        uint256 USDborrowed = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
-        require(colInUSD >= borrowMargin, "Liquidation margin not met!");
-        //debatable check ends here
         //update mapping with new collateral amount
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
         emit IncreaseCollateral(msg.sender, currencyKey, _colAmount);
@@ -198,7 +237,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external override whenNotPaused 
+        ) external override 
         {
         _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
@@ -217,13 +256,15 @@ contract Vault_Synths is Vault_Base_ERC20 {
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey);
         uint256 isoUSDdebt = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        require( isoUSDdebt >= _USDToVault, "Trying to return more isoUSD than borrowed!");
+        if(isoUSDdebt < _USDToVault){
+            _USDToVault = isoUSDdebt;
+        }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
-        if(outstandingisoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
+        if((outstandingisoUSD > 0) && (_collateralToUser > 0)){ //check for leftover debt
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
             uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
-            require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
+            require(colInUSD >= borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
         
         //record paying off loan principle before interest
@@ -267,7 +308,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external override whenNotPaused  
+        ) external override 
         {   
             _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 

@@ -4,7 +4,7 @@
 
 pragma solidity =0.8.9;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+//import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -71,7 +71,8 @@ contract Locker is ConfirmedOwnerWithProposal(msg.sender, address(0)) {
         uint256 NFTId = votingEscrow.create_lock(_tokenAmount, _lockDuration);
         //store new NFTId for reference
         veNFTIds.push(NFTId);
-        emit GenerateVeNFT(NFTId, _tokenAmount, _lockDuration);
+        uint256 weeksLocked = (_lockDuration / 1 weeks )* 1 weeks;
+        emit GenerateVeNFT(NFTId, _tokenAmount, weeksLocked);
 
     }
     
@@ -83,7 +84,8 @@ contract Locker is ConfirmedOwnerWithProposal(msg.sender, address(0)) {
     **/
     function relockVELO(uint256 _NFTId, uint256 _lockDuration) external onlyOwner{
         votingEscrow.increase_unlock_time(_NFTId, _lockDuration);
-        emit RelockVeNFT(_NFTId, _lockDuration);
+        uint256 weeksLocked = (_lockDuration / 1 weeks )* 1 weeks;
+        emit RelockVeNFT(_NFTId, weeksLocked);
     }
 
     /**

@@ -24,6 +24,7 @@ const sETH_OP = `0xE405de8F52ba7559f9df3C368500B6E6ae6Cee49`;
 const sBTC_OP = `0x298B9B95708152ff6968aafd889c6586e9169f1D`;
 const Synthetix_owner_OP = `0x6d4a64C57612841c2C6745dB2a4E4db34F002D20`;
 const system_OP = `0xE8c41bE1A167314ABAF2423b72Bf8da826943FFD`;
+const Address_Resolver = "0x95A6a3f44a70172E7d50a9e28c85Dfd712756B8C";
 const sUSDDoner_OP = "0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b" //"0x2f17058C77F70F52D89AA5D54300b30EEf9FA6fC"; //doner for sUSD
 const SETHDoner_OP = "0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b" //`0xa5f7a39E55D7878bC5bd754eE5d6BD7a7662355b`; //doner for sETH
 const Exchange_Rates_OP = `0x22602469d704BfFb0936c7A7cfcD18f7aA269375`; //Synth exchange rates 
@@ -32,6 +33,7 @@ const Proxy_ERC20_OP = `0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4`; //Proxy for
 const Lyra_LP = "0x5Db73886c4730dBF3C562ebf8044E19E8C93843e"; //Lyra's sETH Liquidity Pool 
 const Lyra_LP_token = `0x0d1a91354A387a1e9E8FCD8f576670c4C3b723cA` //Lyra's sETH LP token
 const Lyra_Doner = `0x9644A6920bd0a1923C2C6C1DddF691b7a42e8A65`
+const Lyra_Rewards_Distributor = `0x019f0233c0277b9422fcdb1213b09c86f5f27d87`; //MultiDistribution contract used to allocate OP and stkLYRA rewards to LPs
 const USDC = `0x7F5c764cBc14f9669B88837ca1490cCa17c31607` 
 const router = "0xa132DAB612dB5cB9fC9Ac426A0Cc215A3423F9c9"
 const chainlink_SUSD_feed = "0x7f99817d87baD03ea21E05112Ca799d715730efe"
@@ -48,6 +50,7 @@ const vAMM_VELO_OP = "0xFFD74EF185989BFF8752c818A53a47FC45388F08"
 const OP_Token = "0x4200000000000000000000000000000000000042"
 const SNX_Token = "0x8700dAec35aF8Ff88c16BdF0418774CB3D7599B4"
 const sAMM_USDC_sUSD_Doner = "0xb03f52d2db3e758dd49982defd6aeefea9454e80"
+
 
 
 
@@ -93,8 +96,10 @@ const optimism_OP = {sUSD: sUSD_OP, sETH: sETH_OP, sBTC: sBTC_OP,
                             System: system_OP, sUSD_Doner: sUSDDoner_OP,
                             sETH_Doner: SETHDoner_OP, Exchange_Rates: Exchange_Rates_OP,
                             System_Status: System_Status_OP, Proxy_ERC20: Proxy_ERC20_OP,
+                            Address_Resolver : Address_Resolver,
                             Lyra_LP: Lyra_LP, Lyra_LP_token: Lyra_LP_token,
                             Lyra_Doner: Lyra_Doner,
+                            Lyra_Rewards_Distributor : Lyra_Rewards_Distributor,
                             USDC: USDC, Router: router,
                             Chainlink_SUSD_Feed : chainlink_SUSD_feed,
                             VELO : VELO, Velo_Voter : Velo_Voter, 

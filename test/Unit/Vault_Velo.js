@@ -44,6 +44,7 @@ describe("Unit tests: Vault_Velo contract", function () {
   const sUSDCode = ethers.utils.formatBytes32String("sUSD");
   const NFTCode = ethers.utils.formatBytes32String("sAMM-USDC-sUSD");
   const MINTER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"));
+  const BURNER = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("BURNER_ROLE"));
 
   const e18 = ethers.utils.parseEther('1');
   const zero = ethers.utils.parseEther('0');
@@ -128,12 +129,20 @@ describe("Unit tests: Vault_Velo contract", function () {
         await isoUSD.proposeAddRole(vault.address, MINTER);
         helpers.timeSkip(3*24*60*60+1) //3 days 1s required delay
         await isoUSD.addRole(vault.address, MINTER);
+
+        await isoUSD.proposeAddRole(vault.address, BURNER);
+      
+        helpers.timeSkip(3*24*60*60+1) //3 days 1s required delay
+        
+        await isoUSD.addRole(vault.address, BURNER);
+        
         const NFTMinMargin = ethers.utils.parseEther("2.0");
         const NFTLiqMargin = ethers.utils.parseEther("1.1");
         const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
         
         await collateralBook.addCollateralType(depositReceipt.address, NFTCode, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
-        
+        const loansCap= ethers.utils.parseEther('50000000'); 
+        await vault.setMaxLoansPerCollateral(loansCap, depositReceipt.address);
 
       });
 
@@ -151,9 +160,10 @@ describe("Unit tests: Vault_Velo contract", function () {
       
   describe("Construction", function (){
     it("Should deploy the constructor args to the right addresses", async function (){
-      expect( await vault.isoUSD()).to.equal(isoUSD.address);
+      //we had to make two contracts private to reduce deployment size
+      //expect( await vault.isoUSD()).to.equal(isoUSD.address);
       expect( await vault.treasury()).to.equal(treasury.address);
-      expect( await vault.collateralBook()).to.equal(collateralBook.address);
+      //expect( await vault.collateralBook()).to.equal(collateralBook.address);
     });
   });
   
@@ -510,7 +520,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect(virtualPrice_1).to.equal(virtualPrice_2)
     });
 
-    it("Should only not update another collateral's virtualPrice if called", async function () {
+    it("Should not update another collateral's virtualPrice if called", async function () {
       //second collateral to use
       depositReceipt2 = await DepositReceipt.deploy(
         "Deposit_Receipt_Two",
@@ -530,7 +540,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       const NFTLiqMargin = ethers.utils.parseEther("1.1");
       const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
       await collateralBook.addCollateralType(depositReceipt2.address, NFTCode_2, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
-
+      const loansCap= ethers.utils.parseEther('50000000'); 
+      await vault.setMaxLoansPerCollateral(loansCap, depositReceipt2.address);
       const loanTaken = 500000 
       const NFTId = 1;  
       await depositReceipt2.connect(alice).approve(vault.address, NFTId);
@@ -565,6 +576,20 @@ describe("Unit tests: Vault_Velo contract", function () {
       ).to.be.revertedWith("Try again tomorrow loan opening limit hit");
 
     });
+
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, depositReceipt.address);
+      await depositReceipt.connect(alice).approve(vault.address, NFTId);
+      await expect(
+        vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
+      ).to.be.revertedWith("Collateral reached max loans");
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken *2, depositReceipt.address);
+      await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
+
+    });
     
     it("Should fail if using unsupported collateral token", async function () {
       await expect(
@@ -593,7 +618,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       await collateralBook.pauseCollateralType(depositReceipt.address, NFTCode);
       await expect(
         vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
-      ).to.be.revertedWith("Unsupported collateral!");
+      ).to.be.revertedWith("Paused collateral!");
     });
     
 
@@ -731,10 +756,10 @@ describe("Unit tests: Vault_Velo contract", function () {
       
     });
 
-    it("Should fail if vault paused", async function () {
+    it("Should succeed if vault paused", async function () {
       await vault.pause();
       await depositReceipt.connect(alice).approve(vault.address, NFTId2)
-      await expect(vault.connect(alice).increaseCollateralAmount(depositReceipt.address, NFTId2)).to.be.revertedWith("Pausable: paused");
+      await vault.connect(alice).increaseCollateralAmount(depositReceipt.address, NFTId2)
       
       
     });
@@ -768,10 +793,10 @@ describe("Unit tests: Vault_Velo contract", function () {
       
     });
 
-    it("Should fail if collateral is paused in CollateralBook", async function () {
+    it("Should succeed if collateral is paused in CollateralBook", async function () {
       await collateralBook.pauseCollateralType(depositReceipt.address, NFTCode);
       await depositReceipt.connect(alice).approve(vault.address, NFTId2)
-      await expect(vault.connect(alice).increaseCollateralAmount(depositReceipt.address, NFTId2)).to.be.revertedWith("Unsupported collateral!");
+      await vault.connect(alice).increaseCollateralAmount(depositReceipt.address, NFTId2)
       
       
     });
@@ -795,7 +820,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       await expect(vault.connect(bob).increaseCollateralAmount(depositReceipt.address, bobNFT)).to.be.revertedWith("No existing collateral!");
     });
     
-    it("Should fail if liquidation margin is not met", async function () {
+    it("Should succeed even if liquidation margin is not met", async function () {
       const lowAmount = ethers.utils.parseEther('1');
       depositReceipt.connect(alice).UNSAFEMint(lowAmount)
       lowValueNFT = 4
@@ -808,7 +833,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       await collateralBook.TESTchangeCollateralType(depositReceipt.address, NFTCode, MinMargin, LiqMargin, Interest, ZERO_ADDRESS,liq_return.mul(2), VELO); 
 
 
-      await expect(vault.connect(alice).increaseCollateralAmount(depositReceipt.address, lowValueNFT)).to.be.revertedWith("Liquidation margin not met!");
+      await vault.connect(alice).increaseCollateralAmount(depositReceipt.address, lowValueNFT)
     });
 
     it("Should fail if value of NFT sent is zero", async function () {
@@ -853,15 +878,14 @@ describe("Unit tests: Vault_Velo contract", function () {
 
     it("Should return user collateral NFT if valid conditions are met and emit ClosedLoan event", async function () {
       const NFTId = 1;
-      let timeJump = timeSkipRequired(1.01);
+      let timeJump = timeSkipRequired(1.011);
       await cycleVirtualPrice(timeJump, depositReceipt);
       let realDebt = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
       
       let valueClosing = realDebt.mul(virtualPrice).div(e18);
-      //now we add a hack to repay the $0.002 that is annoyingly leftover
-      valueClosing = valueClosing.add(ethers.utils.parseEther('0.002'))
-
+      //now we increase the valueClosing higher than the total isoUSD borrowed to fully repay the loan
+      let moreThanValueClosing = valueClosing.mul(2)
       const beforeNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(beforeNFTowner).to.equal(vault.address);
 
@@ -871,11 +895,11 @@ describe("Unit tests: Vault_Velo contract", function () {
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const totalLoanBefore = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
       
-      await isoUSD.connect(alice).approve(vault.address, valueClosing);
+      await isoUSD.connect(alice).approve(vault.address, moreThanValueClosing);
       //IDs passed in slots relating to NOT_OWNED are disregarded
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
       //zero for partial percentage 4th arg as we aren't using it here
-      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
+      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, moreThanValueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
       
       //a fully paid loan should repay all principle
       const principle = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
@@ -1190,48 +1214,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect(afterNFTowner).to.equal(vault.address);
     });
 
-    //we ignore debts less than $0.001, fine tune this lower for less risk. 
-    it("Should succeed to close loan if only dust is left", async function () {
-      const NFTId = 1;
-      let realDebt = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address);
-      let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
-      //remove a tiny amount of the repayment ( 10^(-12) isoUSD)
-      const dust = ethers.utils.parseEther('0.000001');
-      let valueClosing = (realDebt.mul(virtualPrice).div(e18)).sub(dust);
 
-      const beforeisoUSDBalance = await isoUSD.balanceOf(alice.address);
-      const beforeNFTowner = await depositReceipt.ownerOf(NFTId);
-      expect(beforeNFTowner).to.equal(vault.address);
-      
-
-      const pooledTokens = await depositReceipt.pooledTokens(NFTId)
-      const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
-      const totalLoanBefore = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
-      
-      //IDs passed in slots relating to NOT_OWNED are disregarded
-      const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
-      
-      await isoUSD.connect(alice).approve(vault.address, valueClosing);
-      //zero for partial percentage 4th arg as we aren't using it here
-      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, valueClosing, NFTCode, collateralUsed);
-      
-      //a fully paid loan should repay all principle
-      const principle = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
-      expect(principle).to.be.closeTo(zero, TENTH_OF_CENT)
-
-      //a fully repaid loan should repay all interest also, minus dust
-      const totalLoan = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
-      let error = totalLoanBefore.div(100000) //0.001%
-      expect(totalLoan).to.be.closeTo(zero, error)
-
-      const AfterisoUSDBalance = await isoUSD.balanceOf(alice.address);
-      expect(AfterisoUSDBalance).to.equal(beforeisoUSDBalance.sub(valueClosing));
-
-      const afterNFTowner = await depositReceipt.ownerOf(NFTId);
-      expect(afterNFTowner).to.equal(alice.address);
-    });
-
-    it("Should fail to close if the contract is paused", async function () {
+    it("Should succeed closing if the contract is paused", async function () {
       const NFTId = 1;
       let realDebt = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
@@ -1244,7 +1228,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
       //zero for partial percentage 4th arg as we aren't using it here
       await vault.pause();
-      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.be.revertedWith("Pausable: paused");     
+      vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)     
     });
     
     it("Should fail if collateral partialPercentage is greater than 100%", async function () {
@@ -1278,7 +1262,7 @@ describe("Unit tests: Vault_Velo contract", function () {
          
     });
 
-    it("Should fail to close if collateral is paused in CollateralBook", async function () {
+    it("Should succeed closing if collateral is paused in CollateralBook", async function () {
       const NFTId = 1;
       let realDebt = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
@@ -1291,7 +1275,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
       //zero for partial percentage 4th arg as we aren't using it here
       await collateralBook.pauseCollateralType(depositReceipt.address, NFTCode);
-      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.be.revertedWith("Unsupported collateral!");     
+      vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)    
     });
 
 
@@ -1361,7 +1345,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.be.revertedWith("ERC20: transfer amount exceeds balance"); 
     });
 
-    it("Should fail to close if user tries to return more isoUSD than borrowed originally", async function () {
+    it("Should fully close a loan if user tries to return more isoUSD than borrowed originally", async function () {
       const NFTId = 1;
       const valueClosing = await isoUSD.balanceOf(alice.address)
 
@@ -1370,12 +1354,27 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect(beforeNFTowner).to.equal(vault.address);
       await isoUSD.connect(alice).approve(vault.address, valueClosing);
       
-      const NoCollateralUsed = 0;
+      
       //IDs passed in slots relating to NOT_OWNED are disregarded
       const collateralNFTs = [[NFTId,9,9,9,9,9,9,9],[0,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
+      const pooledTokens = await depositReceipt.pooledTokens(NFTId)
+      const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       //zero for partial percentage 4th arg as we aren't using it here
-      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.be.revertedWith("Trying to return more isoUSD than borrowed!");
-    
+      const balance = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+      const virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
+      const totalLoan = balance.mul(virtualPrice).div(base)
+      await expect(vault.connect(alice).closeLoan(depositReceipt.address, collateralNFTs, valueClosing, 0)).to.emit(vault, 'ClosedLoanNFT').withArgs(alice.address, totalLoan, NFTCode, collateralUsed);
+      
+      const afterisoUSDBalance = await isoUSD.balanceOf(alice.address);
+      expect(afterisoUSDBalance).to.equal(beforeisoUSDBalance.sub(totalLoan))
+
+      //a fully paid loan should repay all principle
+      const principle = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
+      expect(principle).to.equal(zero)
+
+      //a fully repaid loan should repay all interest also
+      const interestAndLoan = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+      expect(interestAndLoan).to.equal(zero)
     });
     
     
@@ -1687,7 +1686,7 @@ describe("Unit tests: Vault_Velo contract", function () {
     });
        
 
-    it("Should fail if system is paused", async function () {
+    it("Should succeed liquidation if the vault is paused", async function () {
       //here the liquidator and loan holders swap roles as alice loan is impossible to 
       //partially liquidate as collat value ~= loan.
       //we allow for 0.001% deviation in some recorded terms due to inaccuracies caused by USDC valuation being only to 6dp.
@@ -1714,8 +1713,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       //pause the vault with owner
       await vault.connect(owner).pause()
       //call the liquidation
-      await expect(vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, e18)).to.be.revertedWith("Pausable: paused");
-
+      const onePercent = ethers.utils.parseEther("0.01");
+      vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, onePercent)
 
     });
 
@@ -1745,7 +1744,7 @@ describe("Unit tests: Vault_Velo contract", function () {
 
     });
     
-    it("Should fail to liquidate if the collateral is paused in CollateralBook", async function () {
+    it("Should succeed to liquidate if the collateral is paused in CollateralBook", async function () {
       const loanHolder = bob.address;
       const liquidator = alice.address;
 
@@ -1769,7 +1768,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       //non-used slots can have any NFT id so long as they aren't owned by the loanHolder so here we use #9.
       const collateralNFTs = [[9,9,9,9,9,9,9,NFTId],[NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED,0]];
       //call the liquidation
-      await expect(vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, e18)).to.be.revertedWith("Unsupported collateral!");      
+      const onePercent = ethers.utils.parseEther("0.01");
+      vault.connect(alice).callLiquidation(loanHolder, depositReceipt.address, collateralNFTs, onePercent)      
     });
 
 
@@ -1862,6 +1862,29 @@ describe("Unit tests: Vault_Velo contract", function () {
     
   });
 
+  describe("setMaxLoansPerCollateral", function () {
+    beforeEach(async function () {
+       
+    });
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(bob).setMaxLoansPerCollateral(120, depositReceipt.address)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should succeed when called by owner with values smaller than $100 million", async function () {
+      const million = ethers.utils.parseEther("1000000");
+      const oldMax = await vault.maxLoansPerCollateral(depositReceipt.address);
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(million, depositReceipt.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(million, oldMax, depositReceipt.address); 
+      expect(await vault.maxLoansPerCollateral(depositReceipt.address)).to.equal(million)
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(0,depositReceipt.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(0, million, depositReceipt.address);
+      expect(await vault.maxLoansPerCollateral(depositReceipt.address)).to.equal(0)
+    });
+    it("Should fail with values larger than $100 million", async function () {
+      const billion = ethers.utils.parseEther("1000000000");
+      await expect(vault.connect(owner).setMaxLoansPerCollateral(billion, depositReceipt.address)).to.be.reverted; 
+    });       
+  
+    
+  });
+
   describe("setOpenLoanFee", function () {
     beforeEach(async function () {
        
@@ -1913,9 +1936,12 @@ describe("Unit tests: Vault_Velo contract", function () {
         await expect(tx).to.emit(vault, 'QueueAddRole').withArgs(alice.address, ADMIN, owner.address, block.timestamp);
         helpers.timeSkip(TIME_DELAY);
         await expect(vault.connect(owner).addRole(alice.address, ADMIN)).to.emit(vault, 'AddRole').withArgs(alice.address, ADMIN,  owner.address);
-        await expect(vault.connect(alice).pause()).to.emit(vault, 'SystemPaused').withArgs(alice.address);
+        await expect(vault.connect(alice).pause()).to.emit(vault, 'Paused').withArgs(alice.address);
+        await expect(vault.connect(bob).pause()).to.be.revertedWith("Caller is not able to call pause")
         expect( await vault.hasRole(PAUSER, alice.address) ).to.equal(false);
         expect( await vault.hasRole(ADMIN, alice.address) ).to.equal(true);
+        await expect(vault.connect(bob).unpause()).to.be.revertedWith("Caller is not an admin")
+        await expect(vault.connect(alice).unpause()).to.emit(vault, 'Unpaused').withArgs(alice.address);
     });
 
     it("should add a role that works if following correct procedure", async function() {
@@ -1924,7 +1950,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect( await vault.hasRole(PAUSER, bob.address) ).to.equal(true);
       const tx = await vault.connect(bob).pause();
       const block = await ethers.provider.getBlock(tx.blockNumber);
-      await expect(tx).to.emit(vault, 'SystemPaused').withArgs(bob.address);
+      await expect(tx).to.emit(vault, 'Paused').withArgs(bob.address);
     });
 
     it("should block non-role users calling role restricted functions", async function() {

@@ -7,13 +7,14 @@ pragma abicoder v2;
 
 // External Lyra interface
 import "./helper/interfaces/ILiquidityPoolAvalon.sol";
+import "./helper/interfaces/IMultiDistributor.sol";
 
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
 
 contract Vault_Lyra is Vault_Base_ERC20{
-
+    
     constructor(
         address _isoUSD, //isoUSD address
         address _treasury, //treasury address
@@ -63,7 +64,24 @@ contract Vault_Lyra is Vault_Base_ERC20{
         ILiquidityPoolAvalon.LiquidityPoolParameters memory params = _liquidityPool.lpParams();
         return ( params.withdrawalFee );
     }
-    
+    /**
+        External admin only functions
+    */
+
+
+    function claimLyraRewards(address[] calldata _tokens, address distributor) onlyAdmin external{
+        IMultiDistributor(distributor).claim(_tokens);
+        uint256 length = _tokens.length;
+        for(uint256 i =0; i < length; i++){
+            require(!collateralBook.collateralValid(_tokens[i]), "Cannot withdraw collaterals");
+            IERC20 currentToken = IERC20(_tokens[i]);
+            uint256 amount = currentToken.balanceOf(address(this));
+            currentToken.transfer(msg.sender, amount);        
+        }
+        
+    }
+
+
 
     /**
         Public functions 
@@ -106,6 +124,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         ) external override whenNotPaused 
         {
         _collateralExists(_collateralAddress);
+        require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
         IERC20 collateral = IERC20(_collateralAddress);
         
         require(collateral.balanceOf(msg.sender) >= _colAmount, "User lacks collateral quantity!");
@@ -139,7 +158,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
 
         //Now all effects are handled, transfer the assets so we follow CEI pattern
         _increaseCollateral(collateral, _colAmount);
-        _increaseLoan(_USDborrowed);
+        _increaseLoan(_USDborrowed, _collateralAddress);
         
         
     }
@@ -155,7 +174,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external override whenNotPaused 
+        ) external override 
         {
         _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
@@ -176,13 +195,6 @@ contract Vault_Lyra is Vault_Base_ERC20{
         ) = _getCollateral(_collateralAddress);
         //check for frozen or paused collateral
         _checkIfCollateralIsActive(currencyKey);
-        //debatable check begins here 
-        uint256 totalCollat = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
-        uint256 colInUSD = priceCollateralToUSD(currencyKey, totalCollat);
-        uint256 USDborrowed = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        uint256 borrowMargin = (USDborrowed * liquidatableMargin) / LOAN_SCALE;
-        require(colInUSD >= borrowMargin, "Liquidation margin not met!");
-        //debatable check ends here
         //update mapping with new collateral amount
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] + _colAmount;
         emit IncreaseCollateral(msg.sender, currencyKey, _colAmount);
@@ -206,7 +218,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external override whenNotPaused  
+        ) external override  
         {
         _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
@@ -222,16 +234,19 @@ contract Vault_Lyra is Vault_Base_ERC20{
             uint256 virtualPrice,
             
         ) = _getCollateral(_collateralAddress);
-        //check for frozen or paused collateral
-        _checkIfCollateralIsActive(currencyKey);
+        
         uint256 isoUSDdebt = (isoUSDLoanAndInterest[_collateralAddress][msg.sender] * virtualPrice) / LOAN_SCALE;
-        require( isoUSDdebt >= _USDToVault, "Trying to return more isoUSD than borrowed!");
+        if(isoUSDdebt < _USDToVault){
+            _USDToVault = isoUSDdebt;
+        }
         uint256 outstandingisoUSD = isoUSDdebt - _USDToVault;
-        if(outstandingisoUSD >= TENTH_OF_CENT){ //ignore leftover debts less than $0.001
+        if((outstandingisoUSD > 0) && (_collateralToUser > 0)){  //check for leftover debt
+            //check for frozen or paused collateral
+            _checkIfCollateralIsActive(currencyKey);
             uint256 collateralLeft = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
             uint256 colInUSD = priceCollateralToUSD(currencyKey, collateralLeft); 
             uint256 borrowMargin = (outstandingisoUSD * minOpeningMargin) / LOAN_SCALE;
-            require(colInUSD > borrowMargin , "Remaining debt fails to meet minimum margin!");
+            require(colInUSD >= borrowMargin , "Remaining debt fails to meet minimum margin!");
         }
 
         //record paying off loan principle before interest
@@ -275,7 +290,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external override whenNotPaused  
+        ) external override  
         {   
             _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 
