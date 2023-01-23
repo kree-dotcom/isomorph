@@ -20,6 +20,7 @@ import "./interfaces/IAggregatorV3.sol";
 import "./interfaces/IAccessControlledOffchainAggregator.sol";
 
 
+
 contract Vault_Synths is Vault_Base_ERC20 {
     
     //Constants, private to reduce code size
@@ -27,7 +28,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
     bytes32 private constant EXCHANGE_RATES = "ExchangeRates";
     bytes32 private constant EXCHANGER = "Exchanger";
     uint256 private constant ONE_HUNDRED_DOLLARS = 100 ether;
-    uint256 private constant HEARTBEAT = 24 hours; //sUSD Chainlink Optimism heartbeat time
+    uint256 internal HEARTBEAT = 24 hours; //sUSD Chainlink Optimism heartbeat time, not a constant for testing purposes
     uint256 private constant ORACLE_BASE = 1e8; // ten to the power of the number of decimals given to the price feed
     
     //Optimism Mainnet addresses
@@ -176,7 +177,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
 
         //Now all effects are handled, transfer the assets so we follow CEI pattern
         _increaseCollateral(collateral, _colAmount);
-        _increaseLoan(_USDborrowed);
+        _increaseLoan(_USDborrowed, _collateralAddress);
         
         
     }

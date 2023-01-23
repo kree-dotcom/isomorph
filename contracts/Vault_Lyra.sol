@@ -158,7 +158,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
 
         //Now all effects are handled, transfer the assets so we follow CEI pattern
         _increaseCollateral(collateral, _colAmount);
-        _increaseLoan(_USDborrowed);
+        _increaseLoan(_USDborrowed, _collateralAddress);
         
         
     }

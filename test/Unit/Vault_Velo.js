@@ -141,7 +141,8 @@ describe("Unit tests: Vault_Velo contract", function () {
         const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
         
         await collateralBook.addCollateralType(depositReceipt.address, NFTCode, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
-        
+        const loansCap= ethers.utils.parseEther('50000000'); 
+        await vault.setMaxLoansPerCollateral(loansCap, depositReceipt.address);
 
       });
 
@@ -519,7 +520,7 @@ describe("Unit tests: Vault_Velo contract", function () {
       expect(virtualPrice_1).to.equal(virtualPrice_2)
     });
 
-    it("Should only not update another collateral's virtualPrice if called", async function () {
+    it("Should not update another collateral's virtualPrice if called", async function () {
       //second collateral to use
       depositReceipt2 = await DepositReceipt.deploy(
         "Deposit_Receipt_Two",
@@ -539,7 +540,8 @@ describe("Unit tests: Vault_Velo contract", function () {
       const NFTLiqMargin = ethers.utils.parseEther("1.1");
       const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
       await collateralBook.addCollateralType(depositReceipt2.address, NFTCode_2, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
-
+      const loansCap= ethers.utils.parseEther('50000000'); 
+      await vault.setMaxLoansPerCollateral(loansCap, depositReceipt2.address);
       const loanTaken = 500000 
       const NFTId = 1;  
       await depositReceipt2.connect(alice).approve(vault.address, NFTId);
@@ -572,6 +574,20 @@ describe("Unit tests: Vault_Velo contract", function () {
       await expect(
         vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
       ).to.be.revertedWith("Try again tomorrow loan opening limit hit");
+
+    });
+
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, depositReceipt.address);
+      await depositReceipt.connect(alice).approve(vault.address, NFTId);
+      await expect(
+        vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
+      ).to.be.revertedWith("Collateral reached max loans");
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken *2, depositReceipt.address);
+      await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
 
     });
     
@@ -1841,6 +1857,29 @@ describe("Unit tests: Vault_Velo contract", function () {
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
       await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
+    });       
+  
+    
+  });
+
+  describe("setMaxLoansPerCollateral", function () {
+    beforeEach(async function () {
+       
+    });
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(bob).setMaxLoansPerCollateral(120, depositReceipt.address)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should succeed when called by owner with values smaller than $100 million", async function () {
+      const million = ethers.utils.parseEther("1000000");
+      const oldMax = await vault.maxLoansPerCollateral(depositReceipt.address);
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(million, depositReceipt.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(million, oldMax, depositReceipt.address); 
+      expect(await vault.maxLoansPerCollateral(depositReceipt.address)).to.equal(million)
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(0,depositReceipt.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(0, million, depositReceipt.address);
+      expect(await vault.maxLoansPerCollateral(depositReceipt.address)).to.equal(0)
+    });
+    it("Should fail with values larger than $100 million", async function () {
+      const billion = ethers.utils.parseEther("1000000000");
+      await expect(vault.connect(owner).setMaxLoansPerCollateral(billion, depositReceipt.address)).to.be.reverted; 
     });       
   
     

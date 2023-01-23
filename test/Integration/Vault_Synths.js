@@ -65,6 +65,9 @@ function timeSkipRequired(totalInterest, threeMinInterest){
 }
 
 async function cycleVirtualPrice(steps, collateral) {
+    if(steps < 1){
+      console.log("*** cycleVirtualPrice called for 0 or negative steps!***")
+    }
     steps = Math.floor(steps);
     helpers.timeSkip(steps);
     cycleCount = 240; //12 hours of of data updated at each call
@@ -122,6 +125,8 @@ describe("Integration tests: Vault Synths contract", function () {
   let exchangeRates
   let exchanger
 
+  const twoYears = 60*60*24*365*2; //2 years in seconds
+
   //consts used for maths or the liquidation system
   const colQuantity = ethers.utils.parseEther('2.77');
   const liquidatorFee = 0.05; //5%
@@ -143,6 +148,14 @@ describe("Integration tests: Vault Synths contract", function () {
   const LYRA = 1;
 
   let snapshotId;
+
+  //var to store the outcome of an event arg in for manual verification
+  let capturedValue
+    
+  function captureValue(value) {
+      capturedValue = value
+      return true
+  }
 
 
   // `beforeEach` will run before each test, re-deploying the contract every
@@ -166,7 +179,7 @@ describe("Integration tests: Vault Synths contract", function () {
         deathSeed2 = await deathSeedContract.deploy()
         deathSeed2.terminate(Synthetix_owner, {"value" : e18}); //self destruct giving ETH to SC without receive.
         
-        contract = await ethers.getContractFactory("Vault_Synths");
+        contract = await ethers.getContractFactory("TEST_Vault_Synths");
         isoUSDcontract = await ethers.getContractFactory("isoUSDToken");
 
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
@@ -205,6 +218,9 @@ describe("Integration tests: Vault Synths contract", function () {
         await collateralBook.addCollateralType(sETH.address, sETHCode, sETHMinMargin, sETHLiqMargin, sETHInterest, SYNTH, ZERO_ADDRESS);
         await collateralBook.addCollateralType(sUSD.address, sUSDCode, sUSDMinMargin, sUSDLiqMargin, sUSDInterest, SYNTH, ZERO_ADDRESS);
         
+        const loansCap= ethers.utils.parseEther('50000000'); 
+        await vault.setMaxLoansPerCollateral(loansCap, sETH.address);
+        await vault.setMaxLoansPerCollateral(loansCap, sUSD.address);
         const addressResolver = new ethers.Contract(addressResolver_address, ABIs.AddressResolver, provider);
         let exchangeRates_address = await addressResolver.getAddress(EXCHANGE_RATES)
         let exchanger_address = await addressResolver.getAddress(EXCHANGER)
@@ -374,6 +390,9 @@ describe("Integration tests: Vault Synths contract", function () {
      // SLOW TEST
      it("Should correctly apply interest accrued after a long time", async function () {
       this.timeout(100000);
+  
+      //allow the oracle timestamp to be 2 years stale to enable long passage of time tests
+      await vault.TESTalterHeartbeatTime(twoYears)
       //interest we wish to accrue on loan
       interestToAccrue = 1.375 // i.e. 37.5%
       interestToAccrueBN = ethers.utils.parseEther('1.375');
@@ -520,6 +539,18 @@ describe("Integration tests: Vault Synths contract", function () {
       ).to.be.revertedWith("Try again tomorrow loan opening limit hit");
     });
     
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, sUSD.address);
+      await sUSD.connect(addr1).approve(vault.address, collateralUsed);
+      await expect(
+        vault.connect(addr1).openLoan(sUSD.address, collateralUsed, loanTaken)
+      ).to.be.revertedWith("Collateral reached max loans");
+
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken.mul(2), sUSD.address);
+      await vault.connect(addr1).openLoan(sUSD.address, collateralUsed, loanTaken)
+    });
+
     it("Should fail if using unsupported collateral token", async function () {
       await expect(
         vault.connect(addr2).openLoan(FakeAddr, 1000000, 500000)
@@ -621,6 +652,9 @@ describe("Integration tests: Vault Synths contract", function () {
 
     //SLOW TEST
     it("Should still increase loan after accrued interest if possible", async function () {
+      //allow the oracle timestamp to be 2 years stale to enable long passage of time tests
+      await vault.TESTalterHeartbeatTime(twoYears)
+
       let steps = timeSkipRequired(1.01, threeMinInterest) //interest to achieve i.e 1%
       await cycleVirtualPrice(steps, sUSD);
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
@@ -639,6 +673,9 @@ describe("Integration tests: Vault Synths contract", function () {
     });
     //SLOW TEST
     it("Should fail to increase debt if interest accrued is too high", async function () {
+      //allow the oracle timestamp to be 2 years stale to enable long passage of time tests
+      await vault.TESTalterHeartbeatTime(twoYears)
+
       let steps = timeSkipRequired(1.01, threeMinInterest) //interest to achieve i.e 1%
       await cycleVirtualPrice(steps, sUSD);
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
@@ -1277,8 +1314,13 @@ describe("Integration tests: Vault Synths contract", function () {
       await vault.connect(addr2).openLoan(sUSDaddr, helperAmount, helperLoan);
 
       //timeskip to accrue interest on loan 
-      const sETHInterest2Decimal = 100001800
-      let steps = timeSkipRequired(1.10, sETHInterest2Decimal) //interest to achieve i.e 10%
+      const sETHInterestQuickDecimal = 100070000 //this must be in 1e8 scale otherwise division in timeSkipRequired will occur
+      const sETHMinMargin = ethers.utils.parseEther("2")
+      const sETHLiqMargin = ethers.utils.parseEther("1.1");
+      const sETHInterestQuick = ethers.utils.parseEther("1.0007");
+      await collateralBook.TESTchangeCollateralType(sETH.address, sETHCode, sETHMinMargin, sETHLiqMargin, sETHInterestQuick,  ZERO_ADDRESS, liq_return.mul(2), SYNTH);   //fake LIQ_RETURN used for ease of tests   
+      
+      let steps = timeSkipRequired(1.10, sETHInterestQuickDecimal) //interest to achieve i.e 10%
       await cycleVirtualPrice(steps, sETH);
 
       //set nearly 1:1 collateral to loan requirements to make situation set up easier again 
@@ -1297,7 +1339,7 @@ describe("Integration tests: Vault Synths contract", function () {
       //repay loan principle leaving behind interest
       await isoUSD.connect(addr1).approve(vault.address, principleRepaid)
       await vault.connect(addr1).closeLoan(sETH.address, collateralWithdrawn, principleRepaid);
-
+     
       //check principle has been fully repaid but interest has not
       expect( await vault.isoUSDLoaned(sETH.address, addr1.address)).to.equal(0)
       let interestRemaining = await vault.isoUSDLoanAndInterest(sETH.address, addr1.address)
@@ -1325,8 +1367,10 @@ describe("Integration tests: Vault Synths contract", function () {
       const liquidateCollateral = await vault.viewLiquidatableAmount(leftoverCollateral, ethPriceBN, realLoanOwed, sETHLiqMargin4)
       const liquidatorPayback = (await vault.priceCollateralToUSD(sETHCode, liquidateCollateral)).mul(base.sub(liquidatorFeeBN)).div(base); 
       
-      await expect (tx).to.emit(vault, 'Liquidation').withArgs(addr1.address, addr2.address, liquidatorPayback, sETHCode, liquidateCollateral);  
-      
+      await expect (tx).to.emit(vault, 'Liquidation').withArgs(addr1.address, addr2.address, captureValue, sETHCode, liquidateCollateral);  
+      //we capture liquidatorPayback as it can occassionally be off by 1 due to JS rounding.
+      expect(capturedValue).to.be.closeTo(liquidatorPayback, 1)
+
       //determine how much isoUSD the liquidator paid
       let liquidatorPaid = liquidatorBalance.sub(await isoUSD.balanceOf(addr2.address))
       //check this matches the written off interest
@@ -1544,6 +1588,29 @@ describe("Integration tests: Vault Synths contract", function () {
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
       await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
+    });       
+  
+    
+  });
+
+  describe("setMaxLoanPerCollateral", function () {
+    beforeEach(async function () {
+       
+    });
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(addr2).setMaxLoansPerCollateral(120, sUSD.address)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should succeed when called by owner with values smaller than $100 million", async function () {
+      const million = ethers.utils.parseEther("1000000");
+      const oldMax = await vault.maxLoansPerCollateral(sUSD.address);
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(million, sUSD.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(million, oldMax, sUSD.address); 
+      expect(await vault.maxLoansPerCollateral(sUSD.address)).to.equal(million)
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(0,sUSD.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(0, million, sUSD.address);
+      expect(await vault.maxLoansPerCollateral(sUSD.address)).to.equal(0)
+    });
+    it("Should fail with values larger than $100 million", async function () {
+      const billion = ethers.utils.parseEther("1000000000");
+      await expect(vault.connect(owner).setMaxLoansPerCollateral(billion, sUSD.address)).to.be.reverted; 
     });       
   
     

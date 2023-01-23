@@ -16,6 +16,8 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 //Time delayed governance
 import "./RoleControl.sol";
 
+
+
 uint256 constant VAULT_TIME_DELAY = 3 days;
 
 abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
@@ -30,6 +32,10 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     //this records loan amounts requested and grows by interest accrued
     //collateral address => user address => total loan and interest owed
     mapping(address => mapping(address => uint256)) public isoUSDLoanAndInterest;
+    //The max isoUSD allowed to be loaned per collateral, allowing a cap to be set 
+    mapping(address => uint256) public maxLoansPerCollateral;
+    //The current total open isoUSD loans per collateral.
+    mapping(address => uint256) public currentTotalLoansPerCollateral;
 
     //variables relating to access control and setting new roles
     bytes32 internal constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -69,6 +75,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     event Liquidation(address indexed loanHolder, address indexed Liquidator, uint256 loanAmountReturned, bytes32 indexed collateralToken, uint256 liquidatedCapital);
     event BadDebtCleared(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
+    event ChangeCollateralMax(uint256 newMax, uint256 oldMax, address collateral);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
     event ChangeTreasury(address oldTreasury, address newTreasury);
 
@@ -95,6 +102,16 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         require(_newDailyMax < 100_000_000 ether ); //sanity check, require less than 100 million opened per day
         emit ChangeDailyMax(_newDailyMax, dailyMax); //ignoring CEI pattern here
         dailyMax = _newDailyMax;
+        
+        
+    }
+
+    /// @notice MaxLoanPerCollateral can be set to 0 effectively preventing anyone from opening new loans.
+    /// @dev Use this limit to finetune the maxmimum loan allowed for more risky collaterals, i.e. ones with less liquidity available for liquidations 
+    function setMaxLoansPerCollateral(uint256 _newMax, address _collateralAddress) external onlyAdmin {
+        require(_newMax < 100_000_000 ether ); //sanity check, require less than 100 million max per collateral
+        emit ChangeCollateralMax(_newMax, maxLoansPerCollateral[_collateralAddress], _collateralAddress ); //ignoring CEI pattern here
+        maxLoansPerCollateral[_collateralAddress] = _newMax;
         
         
     }
@@ -222,11 +239,18 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
       * @dev internal function to handle increases of loan
       * @param _loanAmount amount of isoUSD to be borrowed, some is used to pay the opening fee the rest is sent to the user.
      **/
-    function _increaseLoan(uint256 _loanAmount) internal {
+    function _increaseLoan(uint256 _loanAmount, address _collateralAddress) internal {
         uint256 userMint;
         uint256 loanFee;
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
+        //check the user loan doesn't exceed the current collateral's loan cap
+        currentTotalLoansPerCollateral[_collateralAddress] += _loanAmount;
+        require(
+            currentTotalLoansPerCollateral[_collateralAddress] <= maxLoansPerCollateral[_collateralAddress],
+            "Collateral reached max loans"
+            );
+
         isoUSD.mint(_loanAmount);
         //isoUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
         //slither-disable-next-line unchecked-transfer
@@ -256,8 +280,9 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         uint256 USDBurning = _USDReturned - _interestPaid;
         //slither-disable-next-line unchecked-transfer
         isoUSD.transferFrom(msg.sender, address(this), _USDReturned);
-        //burn original loan principle
+        //burn original loan principle and reduce total current loans for this collateral
         isoUSD.burn(address(this), USDBurning);
+        currentTotalLoansPerCollateral[_collateralAddress] -= USDBurning;
         //transfer interest earned on loan to treasury
         //slither-disable-next-line unchecked-transfer
         isoUSD.transfer(treasury, _interestPaid);

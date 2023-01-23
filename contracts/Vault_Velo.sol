@@ -48,6 +48,10 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     mapping(address => mapping(address => uint256)) public isoUSDLoaned;
     //NFT ids relating to a specific loan
     mapping(address => mapping(address => NFTids)) internal loanNFTids;
+    //The max isoUSD allowed to be loaned per collateral, allowing a cap to be set 
+    mapping(address => uint256) public maxLoansPerCollateral;
+    //The current total open isoUSD loans per collateral.
+    mapping(address => uint256) public currentTotalLoansPerCollateral;
 
     //variables relating to access control and setting new roles
     bytes32 private constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -81,6 +85,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     event LiquidationNFT(address indexed loanHolder, address indexed Liquidator, uint256 loanAmountReturned, bytes32 indexed collateralToken, uint256 liquidatedCapital);
     event BadDebtClearedNFT(address indexed loanHolder, address indexed Liquidator, uint256 debtCleared, bytes32 indexed collateralToken);
     
+    event ChangeCollateralMax(uint256 newMax, uint256 oldMax);
     event ChangeDailyMax(uint256 newDailyMax, uint256 oldDailyMax);
     event ChangeOpenLoanFee(uint256 newOpenLoanFee, uint256 oldOpenLoanFee);
     event ChangeTreasury(address oldTreasury, address newTreasury);
@@ -148,6 +153,16 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         require(_dailyMax < 100_000_000 ether ); //sanity check, require less than 100 million opened per day
         emit ChangeDailyMax(_dailyMax, dailyMax);
         dailyMax = _dailyMax;
+        
+    }
+
+    /// @notice MaxLoanPerCollateral can be set to 0 effectively preventing anyone from opening new loans.
+    /// @dev Use this limit to finetune the maxmimum loan allowed for more risky collaterals, i.e. ones with less liquidity available for liquidations 
+    function setMaxLoansPerCollateral(uint256 _newMax, address _collateralAddress) external onlyAdmin {
+        require(_newMax < 100_000_000 ether ); //sanity check, require less than 100 million max per collateral
+        emit ChangeCollateralMax(_newMax, maxLoansPerCollateral[_collateralAddress] ); //ignoring CEI pattern here
+        maxLoansPerCollateral[_collateralAddress] = _newMax;
+        
         
     }
 
@@ -265,11 +280,17 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
       * @dev internal function to handle increases of loan
       * @param _loanAmount amount of isoUSD to be borrowed, some is used to pay the opening fee the rest is sent to the user.
      **/
-    function _increaseLoan(uint256 _loanAmount) internal {
+    function _increaseLoan(uint256 _loanAmount,  address _collateralAddress) internal {
         uint256 userMint;
         uint256 loanFee;
         _checkDailyMaxLoans(_loanAmount);
         (userMint, loanFee) = _findFees(loanOpenFee, _loanAmount);
+        //check the user loan doesn't exceed the current collateral's loan cap
+        currentTotalLoansPerCollateral[_collateralAddress] += _loanAmount;
+        require(
+            currentTotalLoansPerCollateral[_collateralAddress] <= maxLoansPerCollateral[_collateralAddress],
+            "Collateral reached max loans"
+            );
         isoUSD.mint(_loanAmount);
         //isoUSD reverts on transfer failure so we can safely ignore slither's warnings for it.
         //slither-disable-next-line unchecked-transfer
@@ -306,8 +327,9 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             uint256 USDBurning = _USDReturned - _interestPaid;
             //slither-disable-next-line unchecked-transfer
             isoUSD.transferFrom(msg.sender, address(this), _USDReturned);
-            //burn original loan principle
+            //burn original loan principle and reduce total current loans for this collateral
             isoUSD.burn(address(this), USDBurning);
+            currentTotalLoansPerCollateral[_collateralAddress] -= USDBurning;
             //transfer interest earned on loan to treasury
             //slither-disable-next-line unchecked-transfer
             isoUSD.transfer(treasury, _interestPaid);
@@ -419,7 +441,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             _increaseCollateral(depositReceipt, _NFTId);
         }
         
-        _increaseLoan(_USDborrowed);
+        _increaseLoan(_USDborrowed, _collateralAddress);
 
         isoUSDLoaned[_collateralAddress][msg.sender] = isoUSDLoaned[_collateralAddress][msg.sender] + _USDborrowed;
         isoUSDLoanAndInterest[_collateralAddress][msg.sender] = isoUSDLoanAndInterest[_collateralAddress][msg.sender] + ((_USDborrowed * LOAN_SCALE) / virtualPrice);

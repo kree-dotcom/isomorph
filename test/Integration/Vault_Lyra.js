@@ -153,7 +153,6 @@ describe("Integration tests: Vault Lyra contract", function () {
 
         collateralContract = await ethers.getContractFactory("TESTCollateralBook");
         
-
         isoUSD = await isoUSDcontract.deploy();
         
         treasury = addrs[1]
@@ -181,6 +180,9 @@ describe("Integration tests: Vault Lyra contract", function () {
         const LiqMargin = ethers.utils.parseEther("1.053");
         const Interest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
         await collateralBook.addCollateralType(lyraLPToken.address, lyraCode, MinMargin, LiqMargin, Interest, LYRA, lyraLiqPool.address);
+        const loansCap= ethers.utils.parseEther('50000000'); 
+        await vault.setMaxLoansPerCollateral(loansCap, lyraLPToken.address);
+        
         liveBoardIDs = await optionMarket.getLiveBoards();
         //update stale greek caches
         console.log("Updating stale lyra board Greeks.")
@@ -453,6 +455,18 @@ describe("Integration tests: Vault Lyra contract", function () {
         vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)
       ).to.be.revertedWith("Try again tomorrow loan opening limit hit");
     });
+
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, lyraLPToken.address);
+      await lyraLPToken.connect(addr1).approve(vault.address, collateralUsed);
+      await expect(
+        vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)
+      ).to.be.revertedWith("Collateral reached max loans");
+
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken.mul(2), lyraLPToken.address);
+      await vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)
+    });
     
     it("Should fail if using unsupported collateral token", async function () {
       await expect(
@@ -627,6 +641,18 @@ describe("Integration tests: Vault Lyra contract", function () {
       const loanIncrease = ethers.utils.parseEther('300');
       await vault.setDailyMax(1000);
       await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0,loanIncrease)).to.be.revertedWith("Try again tomorrow loan opening limit hit");
+    });
+
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, lyraLPToken.address);
+      await lyraLPToken.connect(addr1).approve(vault.address, collateralUsed);
+      await expect(
+        vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)
+      ).to.be.revertedWith("Collateral reached max loans");
+
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken.mul(2), lyraLPToken.address);
+      await vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)
     });
     
     it("Should fail if using unsupported collateral token", async function () {
@@ -1529,6 +1555,29 @@ describe("Integration tests: Vault Lyra contract", function () {
     it("Should fail with values larger than $100 million", async function () {
       const billion = ethers.utils.parseEther("1000000000");
       await expect(vault.connect(owner).setDailyMax(billion)).to.be.reverted; 
+    });       
+  
+    
+  });
+
+  describe("setMaxLoanPerCollateral", function () {
+    beforeEach(async function () {
+       
+    });
+    it("Should not allow anyone to call it", async function () {
+      await expect( vault.connect(addr2).setMaxLoansPerCollateral(120, lyraLPToken.address)).to.be.revertedWith("Caller is not an admin"); 
+    });
+    it("Should succeed when called by owner with values smaller than $100 million", async function () {
+      const million = ethers.utils.parseEther("1000000");
+      const oldMax = await vault.maxLoansPerCollateral(lyraLPToken.address);
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(million, lyraLPToken.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(million, oldMax, lyraLPToken.address); 
+      expect(await vault.maxLoansPerCollateral(lyraLPToken.address)).to.equal(million)
+      expect( await vault.connect(owner).setMaxLoansPerCollateral(0,lyraLPToken.address)).to.emit(vault, 'ChangeCollateralMax').withArgs(0, million, lyraLPToken.address);
+      expect(await vault.maxLoansPerCollateral(lyraLPToken.address)).to.equal(0)
+    });
+    it("Should fail with values larger than $100 million", async function () {
+      const billion = ethers.utils.parseEther("1000000000");
+      await expect(vault.connect(owner).setMaxLoansPerCollateral(billion, lyraLPToken.address)).to.be.reverted; 
     });       
   
     

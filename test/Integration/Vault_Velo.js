@@ -147,7 +147,8 @@ describe("Integration tests: Vault_Velo contract", function () {
         const NFTInterest = ethers.utils.parseEther((threeMinInterest/100000000).toString(10), "ether")
         const SYNTH = 1
         await collateralBook.addCollateralType(depositReceipt.address, NFTCode, NFTMinMargin, NFTLiqMargin, NFTInterest, VELO, ZERO_ADDRESS);
-        
+        const loansCap= ethers.utils.parseEther('50000000'); 
+        await vault.setMaxLoansPerCollateral(loansCap, depositReceipt.address);
 
       });
 
@@ -492,6 +493,20 @@ describe("Integration tests: Vault_Velo contract", function () {
       await expect(
         vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, true)
       ).to.be.revertedWith("Try again tomorrow loan opening limit hit");
+
+    });
+
+    it("Should fail if collateral max loan amount is exceeded", async function () {
+      const loanTaken = 500000 
+      const NFTId = 1;  
+      await vault.connect(owner).setMaxLoansPerCollateral(1000, depositReceipt.address);
+      await depositReceipt.connect(alice).approve(vault.address, NFTId);
+      await expect(
+        vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
+      ).to.be.revertedWith("Collateral reached max loans");
+      //should also succeed if the max loan is then increased
+      await vault.connect(owner).setMaxLoansPerCollateral(loanTaken *2, depositReceipt.address);
+      await vault.connect(alice).openLoan(depositReceipt.address, NFTId, loanTaken, addingCollateral)
 
     });
 
