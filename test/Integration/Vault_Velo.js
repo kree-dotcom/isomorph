@@ -177,7 +177,7 @@ describe("Integration tests: Vault_Velo contract", function () {
   
    
   describe("OpenLoans", function () {
-    it("Should mint user isoUSD if given valid conditions at time zero and emit OpenLoan event", async function () {
+    it.only("Should mint user isoUSD if given valid conditions at time zero and emit OpenLoan event", async function () {
       const NFTId = 1;
       const data = await priceOracle.latestRoundData();
       const block = await ethers.provider.getBlock(data.blockNumber);
@@ -213,6 +213,8 @@ describe("Integration tests: Vault_Velo contract", function () {
       const loanAndInterest = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
       //at time zero this should match principle
       expect(loanAndInterest).to.equal(loanTaken)
+
+      expect(await vault.currentTotalLoansPerCollateral(depositReceipt.address)).to.equal(loanTaken);
       
     });
 
@@ -291,7 +293,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       
     });
 
-    it("Should be possible to increase existing loan and emit OpenOrIncreaseLoan event", async function () {
+    it.only("Should be possible to increase existing loan and emit OpenOrIncreaseLoan event", async function () {
       const NFTId = 1;
       const NO_NFT = 0;
       const data = await priceOracle.latestRoundData();
@@ -327,6 +329,8 @@ describe("Integration tests: Vault_Velo contract", function () {
       const middleOwner = await depositReceipt.ownerOf(NFTId)
       expect(middleOwner).to.equal(vault.address)
 
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(depositReceipt.address)
+
       //increase existing loan without adding any collateral.
       await expect(vault.connect(alice).openLoan(depositReceipt.address, NO_NFT, loanTaken2, false)).to.emit(vault, 'OpenOrIncreaseLoanNFT').withArgs(alice.address, loanTaken2, NFTCode, 0 );
       
@@ -344,9 +348,11 @@ describe("Integration tests: Vault_Velo contract", function () {
 
       const principleAfter = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
       expect(principleAfter).to.equal(principle.add(loanTaken2))
+
+      expect(await vault.currentTotalLoansPerCollateral(depositReceipt.address)).to.equal(existingCollateralLoans.add(loanTaken2));
     });
   
-    it("Should openLoan and record debt corrected after time elasped in system", async function () {
+    it.only("Should openLoan and record debt corrected after time elasped in system", async function () {
       const NFTId = 1;
 
       const beforeAddr1Balance = await isoUSD.balanceOf(alice.address);
@@ -390,6 +396,8 @@ describe("Integration tests: Vault_Velo contract", function () {
       //principle should be recorded as loan, unaffected by time changing
       const principle = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
       expect(principle).to.equal(loanTaken)
+
+      expect(await vault.currentTotalLoansPerCollateral(depositReceipt.address)).to.equal(loanTaken);
       
     });
 
@@ -808,6 +816,7 @@ describe("Integration tests: Vault_Velo contract", function () {
       const collateralUsed = await depositReceipt.priceLiquidity(pooledTokens)
       const totalLoanBefore = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
 
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(depositReceipt.address)
 
       await isoUSD.connect(alice).approve(vault.address, valueClosing);
       //IDs passed in slots relating to NOT_OWNED are disregarded
@@ -835,6 +844,9 @@ describe("Integration tests: Vault_Velo contract", function () {
 
       const afterNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(afterNFTowner).to.equal(alice.address);
+
+      //no interest has accrued so the entire loan closing is principle
+      expect(await vault.currentTotalLoansPerCollateral(depositReceipt.address)).to.equal(existingCollateralLoans.sub(valueClosing));
     });
 
     it("Should return user NFT for a successful closeLoan call regardless of NFT ID", async function () {
@@ -1084,7 +1096,7 @@ describe("Integration tests: Vault_Velo contract", function () {
     });
 
      
-    it("Should allow partial closure of loan with no collateral repaid to user", async function () {
+    it.only("Should allow partial closure of loan with no collateral repaid to user", async function () {
       const NFTId = 1;
       let realDebt = await vault.isoUSDLoaned(depositReceipt.address, alice.address);
       let virtualPrice = await collateralBook.viewVirtualPriceforAsset(depositReceipt.address);
@@ -1098,6 +1110,8 @@ describe("Integration tests: Vault_Velo contract", function () {
       const NoCollateralUsed = 0;
       const principleBefore = await vault.isoUSDLoaned(depositReceipt.address, alice.address)
       const totalLoanBefore = await vault.isoUSDLoanAndInterest(depositReceipt.address, alice.address)
+
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(depositReceipt.address)
 
       //IDs passed in slots relating to NOT_OWNED are disregarded
       const collateralNFTs = [[9,9,9,9,9,9,9,9],[NOT_OWNED,NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED, NOT_OWNED,NOT_OWNED, NOT_OWNED]];
@@ -1119,6 +1133,9 @@ describe("Integration tests: Vault_Velo contract", function () {
 
       const afterNFTowner = await depositReceipt.ownerOf(NFTId);
       expect(afterNFTowner).to.equal(vault.address);
+
+      //partial closure means only principle is being repaid here.
+      expect(await vault.currentTotalLoansPerCollateral(depositReceipt.address)).to.equal(existingCollateralLoans.sub(valueClosing));
     });
 
     it("Should succeed to close a loan even if the Vault is paused", async function () {

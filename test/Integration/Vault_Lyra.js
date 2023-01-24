@@ -249,6 +249,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       const loanAndInterest = await vault.isoUSDLoanAndInterest(lyraLPToken.address, addr1.address)
       //at time zero this should match principle
       expect(loanAndInterest).to.equal(loanTaken.mul(base).div(virtualPrice))
+
+      expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(loanTaken);
     });
 
     //slow
@@ -376,6 +378,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       //principle should be unaffected by time changing
       const principle = await vault.isoUSDLoaned(lyraLPToken.address, addr1.address)
       expect(principle).to.equal(loanTaken)
+
+      expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(loanTaken);
       
     });
 
@@ -432,6 +436,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       const beforeAddr1Balance = await isoUSD.balanceOf(addr1.address);
       const beforeTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       const loanIncrease = ethers.utils.parseEther('300');
+
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(lyraLPToken.address)
       
       await expect(vault.connect(addr1).openLoan(lyraLPToken.address, 0, loanIncrease)).to.emit(vault, 'OpenOrIncreaseLoan').withArgs(addr1.address, loanIncrease, lyraCode, 0);
       
@@ -445,6 +451,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       AfterTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       const isoUSDafterTreasury = (loanIncrease.mul(loanOpenfee).div(base)).add(beforeTreasuryBalance);
       expect(AfterTreasuryBalance).to.equal(isoUSDafterTreasury);
+
+      expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(existingCollateralLoans.add(loanIncrease));
       
     });
     
@@ -876,6 +884,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       const beforeTreasuryisoUSDBalance = await isoUSD.balanceOf(treasury.address)
       const beforeColBalance = await lyraLPToken.balanceOf(addr1.address);
       const requestedCollateral = collateralAmount;
+
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(lyraLPToken.address)
       
       await isoUSD.connect(addr1).approve(vault.address, valueClosing);
       await expect (vault.connect(addr1).closeLoan(lyraLPToken.address, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan').withArgs(addr1.address, valueClosing, lyraCode, requestedCollateral);
@@ -900,6 +910,9 @@ describe("Integration tests: Vault Lyra contract", function () {
       
       const AfterColBalance = await lyraLPToken.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
+
+      //no interest has accrued so the entire loan closing is principle
+      expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(existingCollateralLoans.sub(valueClosing));
     });
 
     it("Should return user isoUSD if valid conditions are met and emit ClosedLoan event after interest has accrued", async function () {
@@ -919,6 +932,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       const principleBefore = await vault.isoUSDLoaned(lyraLPToken.address, addr1.address)
       const isoUSDTreasuryBefore = await isoUSD.balanceOf(treasury.address);
       
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(lyraLPToken.address)
+
       await isoUSD.connect(addr1).approve(vault.address, valueClosing);
       await expect (vault.connect(addr1).closeLoan(lyraLPToken.address, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan')
       
@@ -943,6 +958,9 @@ describe("Integration tests: Vault Lyra contract", function () {
       
       const AfterColBalance = await lyraLPToken.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
+
+      //only principle should be removed from the totalLoans, not interest
+      expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(existingCollateralLoans.sub(principleBefore));
     });
 
     it("Should allow reducing margin ratio if in excess by drawing out collateral", async function () {

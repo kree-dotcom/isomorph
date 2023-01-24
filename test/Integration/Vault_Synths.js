@@ -273,6 +273,8 @@ describe("Integration tests: Vault Synths contract", function () {
       const loanAndInterest = await vault.isoUSDLoanAndInterest(sUSD.address, addr1.address)
       //at time zero this should match principle
       expect(loanAndInterest).to.equal(loanTaken)
+
+      expect(await vault.currentTotalLoansPerCollateral(sUSD.address)).to.equal(loanTaken);
       
     });
 
@@ -384,6 +386,8 @@ describe("Integration tests: Vault Synths contract", function () {
       //principle should be unaffected by time changing
       const principle = await vault.isoUSDLoaned(sUSD.address, addr1.address)
       expect(principle).to.equal(loanTaken)
+
+      expect(await vault.currentTotalLoansPerCollateral(sUSD.address)).to.equal(loanTaken);
       
     });
 
@@ -462,6 +466,8 @@ describe("Integration tests: Vault Synths contract", function () {
       //here we use a loanIncrease that is less than the minimum initial loan allowed to check increases can be smaller than this.
       const loanIncrease = ethers.utils.parseEther('3');
 
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(sUSD.address)
+
       await expect(vault.connect(addr1).openLoan(sUSD.address, 0, loanIncrease)).to.emit(vault, 'OpenOrIncreaseLoan').withArgs(addr1.address, loanIncrease, sUSDCode, 0);
       
       const principleAfter = await vault.isoUSDLoaned(sUSD.address, addr1.address)
@@ -474,6 +480,8 @@ describe("Integration tests: Vault Synths contract", function () {
       AfterTreasuryBalance = await isoUSD.balanceOf(treasury.address);
       const isoUSDafterTreasury = (loanIncrease.mul(loanOpenfee).div(base)).add(beforeTreasuryBalance);
       expect(AfterTreasuryBalance).to.equal(isoUSDafterTreasury);
+
+      expect(await vault.currentTotalLoansPerCollateral(sUSD.address)).to.equal(existingCollateralLoans.add(loanIncrease));
       
     });
 
@@ -906,8 +914,10 @@ describe("Integration tests: Vault Synths contract", function () {
       //request full collateral amount back
       const requestedCollateral = collateralAmount;
 
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(sUSD.address)
+
       await isoUSD.connect(addr1).approve(vault.address, valueClosing);
-      await expect (vault.connect(addr1).closeLoan(sUSDaddr, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan').withArgs(addr1.address, valueClosing, sUSDCode, requestedCollateral);
+      await expect (vault.connect(addr1).closeLoan(sUSD.address, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan').withArgs(addr1.address, valueClosing, sUSDCode, requestedCollateral);
       
       //a fully paid loan should repay all principle
       const principle = await vault.isoUSDLoaned(sUSD.address, addr1.address)
@@ -928,6 +938,8 @@ describe("Integration tests: Vault Synths contract", function () {
 
       const AfterColBalance = await sUSD.balanceOf(addr1.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(requestedCollateral));
+
+      expect(await vault.currentTotalLoansPerCollateral(sUSD.address)).to.equal(existingCollateralLoans.sub(valueClosing));
     });
 
     it("Should return user collateral if valid conditions are met and emit ClosedLoan event after interest has accrued", async function () {
@@ -947,6 +959,8 @@ describe("Integration tests: Vault Synths contract", function () {
       const totalLoanBefore = await vault.isoUSDLoanAndInterest(sUSD.address, addr1.address)
       const principleBefore = await vault.isoUSDLoaned(sUSD.address, addr1.address)
       const isoUSDTreasuryBefore = await isoUSD.balanceOf(treasury.address);
+
+      const existingCollateralLoans = await vault.currentTotalLoansPerCollateral(sUSD.address)
 
       await isoUSD.connect(addr1).approve(vault.address, valueClosing);
       await expect (vault.connect(addr1).closeLoan(sUSDaddr, requestedCollateral, valueClosing)).to.emit(vault, 'ClosedLoan')
@@ -970,7 +984,8 @@ describe("Integration tests: Vault Synths contract", function () {
       const expectedFees = (totalLoanBefore.mul(virtualPrice).div(e18)).sub(principleBefore)
       expect(isoUSDTreasury.sub(isoUSDTreasuryBefore)).to.equal(expectedFees);
 
-      
+      //only principle should be removed from the totalLoans, not interest
+      expect(await vault.currentTotalLoansPerCollateral(sUSD.address)).to.equal(existingCollateralLoans.sub(principleBefore));
     });
 
     it("Should allow reducing margin ratio if in excess by drawing out collateral", async function () {
