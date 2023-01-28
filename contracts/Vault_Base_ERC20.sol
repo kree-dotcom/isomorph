@@ -261,7 +261,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @dev internal function used to increase user collateral on loan.
     /// @param _collateral the ERC20 compatible collateral to use, already set up in another function
     /// @param _colAmount the amount of collateral to be transfered to the vault. 
-    function _increaseCollateral(IERC20 _collateral, uint256 _colAmount) internal {
+    function _increaseCollateral(IERC20 _collateral, uint256 _colAmount) internal virtual {
         bool success  =_collateral.transferFrom(msg.sender, address(this), _colAmount);
         //due to contract size we cannot use SafeERC20 so we check for non-reverting ERC20 failures
         require(success);

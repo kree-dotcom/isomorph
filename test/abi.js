@@ -34,6 +34,10 @@ const ERC20 = [
   "event Transfer(address indexed from, address indexed to, uint amount)"
   ];
 
+  const RewardClaimer = [
+    "function claimLyraRewards(address[] _tokens, address distributor) external"
+  ]
+
   const LyraRewardsDistro = [
     "function addToClaims(tuple(address user, uint256 amount)[], address token, uint256 epoch, string memory tag) external",
     "function claimableBalances(address owner, address token) external view returns(uint256)",
@@ -119,7 +123,8 @@ const ERC20 = [
           External_Bribe : External_Bribe,
           Depositor : Depositor,
           Gauge : Gauge,
-          ERC721 : ERC721
+          ERC721 : ERC721,
+          RewardClaimer : RewardClaimer
           }
   module.exports = { ABIs }
 

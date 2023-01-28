@@ -36,6 +36,7 @@ interface ILiquidityPoolAvalon {
   function MOCK_setTotalPoolValueQuote ( uint256 amount ) external;
   function MOCK_updateCBs ( uint256[6] memory liquidity, uint256 spotPrice, uint256 maxSkewVariance, int256 netOptionValue, uint256 maxIvVariance ) external;
   function acceptOwnership (  ) external;
+  function getLpParams()  external view returns ( LiquidityPoolParameters memory params );
   function getTokenPrice (  ) external view returns ( uint256 );
   function getTotalTokenSupply (  ) external view returns ( uint256 );
   function init ( address _liquidityTokens ) external;

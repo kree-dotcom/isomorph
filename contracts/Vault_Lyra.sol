@@ -12,9 +12,16 @@ import "./helper/interfaces/IMultiDistributor.sol";
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
+//Lyra stkLyra & OP reward claimer
+import "./RewardClaimer.sol";
+import "./interfaces/IRewardClaimer.sol";
+
 
 contract Vault_Lyra is Vault_Base_ERC20{
     
+    //collateral address => user address => rewardClaimer address
+    mapping(address => mapping(address => address)) public rewardClaimers;
+
     constructor(
         address _isoUSD, //isoUSD address
         address _treasury, //treasury address
@@ -61,26 +68,34 @@ contract Vault_Lyra is Vault_Base_ERC20{
     /// @notice because the withdrawal fee is dynamic we must fetch it on each LP token valuation in case it's changed
     function _getWithdrawalFee(ILiquidityPoolAvalon _liquidityPool) internal view returns(
         uint256 ){
-        ILiquidityPoolAvalon.LiquidityPoolParameters memory params = _liquidityPool.lpParams();
+        ILiquidityPoolAvalon.LiquidityPoolParameters memory params = _liquidityPool.getLpParams();
         return ( params.withdrawalFee );
     }
-    /**
-        External admin only functions
-    */
 
-
-    function claimLyraRewards(address[] calldata _tokens, address distributor) onlyAdmin external{
-        IMultiDistributor(distributor).claim(_tokens);
-        uint256 length = _tokens.length;
-        for(uint256 i =0; i < length; i++){
-            require(!collateralBook.collateralValid(_tokens[i]), "Cannot withdraw collaterals");
-            IERC20 currentToken = IERC20(_tokens[i]);
-            uint256 amount = currentToken.balanceOf(address(this));
-            currentToken.transfer(msg.sender, amount);        
+    /// @dev this overrides the default implementation in Vault_Base_ERC20 to sent LP tokens directly to rewardClaimer.
+    /// @dev internal function used to increase user collateral on loan.
+    /// @param _collateral the ERC20 compatible collateral to use, already set up in another function
+    /// @param _colAmount the amount of collateral to be transfered to the vault. 
+    function _increaseCollateral(IERC20 _collateral, uint256 _colAmount) internal override {
+        address rewardClaimer = rewardClaimers[address(_collateral)][msg.sender];
+        if(rewardClaimer == address(0)){
+            rewardClaimer = address(new RewardClaimer(msg.sender, address(this), address(_collateral), collateralBook));
+            rewardClaimers[address(_collateral)][msg.sender] = rewardClaimer;
         }
+        bool success  =_collateral.transferFrom(msg.sender, rewardClaimer, _colAmount);
+        //due to contract size we cannot use SafeERC20 so we check for non-reverting ERC20 failures
+        require(success);
         
     }
 
+    /// @dev internal function used to move LP Tokens back to the vault from the claimer contract.
+    /// @param _collateral the ERC20 compatible collateral address to be returned to the vault
+    /// @param _amount the amount of collateral to be transfered to the vault. 
+    function _redeemLPTokens(address _collateral, uint256 _amount, address _loanHolder) internal {
+        //a user must always have called _increaseCollateral before getting here and so should always have a rewardClaimer address
+        IRewardClaimer rewardClaimer = IRewardClaimer(rewardClaimers[address(_collateral)][_loanHolder]);
+        rewardClaimer.withdraw(_amount);
+    }
 
 
     /**
@@ -268,6 +283,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         collateralPosted[_collateralAddress][msg.sender] = collateralPosted[_collateralAddress][msg.sender] - _collateralToUser;
         emit ClosedLoan(msg.sender, _USDToVault, currencyKey, _collateralToUser);
         //Now all effects are handled, transfer the assets so we follow CEI pattern
+        _redeemLPTokens(_collateralAddress, _collateralToUser, msg.sender);
         _decreaseLoan(_collateralAddress, _collateralToUser, _USDToVault, interestPaid);
         }
     
@@ -333,6 +349,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
             }
             //finally we call an internal function that updates mappings
             // burns the liquidator's isoUSD and transfers the collateral to the liquidator as payment
+            _redeemLPTokens(_collateralAddress, liquidationAmount, _loanHolder);
             _liquidate(_loanHolder, _collateralAddress, liquidationAmount, isoUSDreturning, currencyKey, virtualPrice);
             
         } 

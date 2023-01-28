@@ -251,6 +251,9 @@ describe("Integration tests: Vault Lyra contract", function () {
       expect(loanAndInterest).to.equal(loanTaken.mul(base).div(virtualPrice))
 
       expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(loanTaken);
+      
+      //check the reward claimer has been set up
+      expect(await vault.rewardClaimers(lyraLPToken.address, addr1.address)).to.not.equal(ZERO_ADDRESS)
     });
 
     //slow
@@ -424,6 +427,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       smallerLoanTaken = ethers.utils.parseEther('200');
       await vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, smallerLoanTaken);
       
+      const rewardClaimer_address = await vault.rewardClaimers(lyraLPToken.address, addr1.address)
       const principle = await vault.isoUSDLoaned(lyraLPToken.address, addr1.address)
       expect(principle).to.equal(smallerLoanTaken)
 
@@ -454,6 +458,8 @@ describe("Integration tests: Vault Lyra contract", function () {
 
       expect(await vault.currentTotalLoansPerCollateral(lyraLPToken.address)).to.equal(existingCollateralLoans.add(loanIncrease));
       
+      //check rewardClaimer address has not changed
+      expect(await vault.rewardClaimers(lyraLPToken.address, addr1.address)).to.equal(rewardClaimer_address)
     });
     
     it("Should fail if daily max Loan amount exceeded", async function () {
@@ -1237,6 +1243,7 @@ describe("Integration tests: Vault Lyra contract", function () {
   describe("callLiquidation", function () {
 
     let liquidationLoanSize;
+    let rewardClaimer
 
     beforeEach(async function () {
       this.timeout(100000);
@@ -1267,6 +1274,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       liquidationLoanSize = collateralValue.div(numerator).mul(divider)
       
       await vault.connect(addr1).openLoan(lyraLPToken.address, colQuantity, liquidationLoanSize); //i.e. 10mill / 1.1 so liquidatable
+      rewardClaimer = await vault.rewardClaimers(lyraLPToken.address, addr1.address)
       const openingVirtualPrice = await collateralBook.viewVirtualPriceforAsset(lyraLPToken.address);
       const MinMargin3 = ethers.utils.parseEther("2.0");
       const LiqMargin3 = ethers.utils.parseEther("1.1");
@@ -1335,8 +1343,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       expect(AfterisoUSDBalance).to.closeTo(beforeisoUSDBalance.sub(amountLiquidated), error_factor);
       
       const AfterColVaultBalance = await lyraLPToken.balanceOf(vault.address);
-      //Should just be collateral from addr2's loan now
-      expect(AfterColVaultBalance).to.equal(helperAmount); 
+      //No collateral stays in vault, so should be zero
+      expect(AfterColVaultBalance).to.equal(zero); 
 
       const AfterColLiquidatorBalance = await lyraLPToken.balanceOf(addr2.address);
       expect(AfterColLiquidatorBalance).to.equal(beforeColLiquidatorBalance.add(colQuantity));
@@ -1379,7 +1387,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       await isoUSD.connect(addr1).transfer(addr2.address, totalAddr1isoUSD);
 
       const beforeisoUSDBalance = await isoUSD.balanceOf(addr2.address);
-      const beforeColBalanceVault = await lyraLPToken.balanceOf(vault.address);
+      const beforeColBalanceRewardClaimer = await lyraLPToken.balanceOf(rewardClaimer);
       const principleBefore = await vault.isoUSDLoaned(lyraLPToken.address, addr1.address)
       const beforeColBalance = await lyraLPToken.balanceOf(addr2.address);
      
@@ -1406,8 +1414,8 @@ describe("Integration tests: Vault Lyra contract", function () {
       let error_factor = beforeisoUSDBalance.sub(liquidatorPayback).div(10000) //0.01% deviation allowed
       expect(AfterisoUSDBalance).to.closeTo(beforeisoUSDBalance.sub(liquidatorPayback), error_factor);
       
-      const AfterColBalanceVault = await lyraLPToken.balanceOf(vault.address);
-      expect(AfterColBalanceVault).to.equal(beforeColBalanceVault.sub(liquidateCollateral));
+      const AfterColBalanceRewardClaimer = await lyraLPToken.balanceOf(rewardClaimer);
+      expect(AfterColBalanceRewardClaimer).to.equal(beforeColBalanceRewardClaimer.sub(liquidateCollateral));
       
       const AfterColBalance = await lyraLPToken.balanceOf(addr2.address);
       expect(AfterColBalance).to.equal(beforeColBalance.add(liquidateCollateral));
@@ -1487,7 +1495,7 @@ describe("Integration tests: Vault Lyra contract", function () {
       await isoUSD.connect(addr2).transfer(addr1.address, startisoUSDBalance);
       const beforeisoUSDBalance = await isoUSD.balanceOf(addr2.address);
       expect(beforeisoUSDBalance).to.equal(0);
-      const beforeColBalance = await lyraLPToken.balanceOf(vault.address);
+      const beforeColBalance = await lyraLPToken.balanceOf(rewardClaimer);
       expect(beforeColBalance).to.equal(colQuantity);
 
       //modify minimum collateral ratio to enable liquidation
@@ -1675,18 +1683,30 @@ describe("Integration tests: Vault Lyra contract", function () {
     const TIME_DELAY = 3*24*60*60 //3 day second timelock
     const distributor_address = addresses.optimism.Lyra_Rewards_Distributor;
     const distributor = new ethers.Contract(distributor_address, ABIs.LyraRewardsDistro, provider)
+    let rewardClaimer
+
+    before(async function () {
+      const collateralUsed = ethers.utils.parseEther('1000');
+      const loanTaken = ethers.utils.parseEther('500');
+      await lyraLPToken.connect(addr1).approve(vault.address, collateralUsed);
+      await expect(vault.connect(addr1).openLoan(lyraLPToken.address, collateralUsed, loanTaken)).to.emit(vault, 'OpenOrIncreaseLoan').withArgs(addr1.address, loanTaken, lyraCode,collateralUsed );
+      const rewardClaimer_address = await vault.rewardClaimers(lyraLPToken.address, addr1.address)
+      console.log("RC ADD ", rewardClaimer_address)
+      rewardClaimer = new ethers.Contract(rewardClaimer_address, ABIs.RewardClaimer, provider)
+    });
+
     it("Should not allow anyone to call it", async function () {
-      await expect( vault.connect(addr2).claimLyraRewards([addr2.address], distributor.address)).to.be.revertedWith("Caller is not an admin"); 
+      await expect( rewardClaimer.connect(addr2).claimLyraRewards([addr2.address], distributor.address)).to.be.revertedWith("Caller is not loan holder"); 
     });
     it("Should revert if a collateral token is proposed", async function () {
-      await expect( vault.connect(owner).claimLyraRewards([lyraLPToken.address], distributor.address)).to.be.revertedWith("Cannot withdraw collaterals"); 
+      await expect( rewardClaimer.connect(addr1).claimLyraRewards([lyraLPToken.address], distributor.address)).to.be.revertedWith("Cannot withdraw collaterals"); 
     });
     it("Should succeed if collecting valid rewards", async function () {
       tokenClaimed = addresses.optimism.OP_Token;
       //if there is nothing to claim the balance should not change
-      let balanceBefore = await OP.balanceOf(owner.address)
-      await vault.connect(owner).claimLyraRewards([tokenClaimed], distributor.address)
-      let balanceAfter = await OP.balanceOf(owner.address)
+      let balanceBefore = await OP.balanceOf(addr1.address)
+      await rewardClaimer.connect(addr1).claimLyraRewards([tokenClaimed], distributor.address)
+      let balanceAfter = await OP.balanceOf(addr1.address)
       expect(balanceBefore).to.equal(balanceAfter)
 
       //repeat after adding a claim for Vault_Lyra
@@ -1697,17 +1717,17 @@ describe("Integration tests: Vault Lyra contract", function () {
         params: [LyraAdmin], 
       });
       const signer = await provider.getSigner(LyraAdmin);
-      await distributor.connect(signer).addToClaims([[vault.address, amount]], OP.address, 0, "")
+      await distributor.connect(signer).addToClaims([[rewardClaimer.address, amount]], OP.address, 0, "")
       await network.provider.request({
         method: "hardhat_stopImpersonatingAccount",
         params: [LyraAdmin] 
       });
       //validate awaiting claim
-      expect(await distributor.connect(owner).claimableBalances(vault.address, OP.address)).to.equal(amount)
+      expect(await distributor.connect(addr1).claimableBalances(rewardClaimer.address, OP.address)).to.equal(amount)
       //check difference in token balance after claim
-      balanceBefore = await OP.balanceOf(owner.address)
-      let tx = await vault.connect(owner).claimLyraRewards([tokenClaimed], distributor.address)
-      balanceAfter = await OP.balanceOf(owner.address)
+      balanceBefore = await OP.balanceOf(addr1.address)
+      let tx = await rewardClaimer.connect(addr1).claimLyraRewards([tokenClaimed], distributor.address)
+      balanceAfter = await OP.balanceOf(addr1.address)
       expect(balanceAfter).to.equal(balanceBefore.add(amount))
       //for some reason it cannot find this event being emitted but it is not emitted by our contracts so not too important 
       //await expect(tx).to.emit(distributor, 'Claimed').withArgs(tokenClaimed, owner.address, balanceAfter.sub(balanceBefore)); 
