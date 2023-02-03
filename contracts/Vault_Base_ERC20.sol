@@ -9,8 +9,9 @@ pragma abicoder v2;
 import "./interfaces/IisoUSDToken.sol";
 import "./interfaces/ICollateralBook.sol";
 
-//Open Zeppelin dependancies
+//External OpenZeppelin dependancies
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
 //Time delayed governance
@@ -22,6 +23,7 @@ uint256 constant VAULT_TIME_DELAY = 3 days;
 
 abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
 
+    using SafeERC20 for IERC20;
     
     //these mappings store the loan details of each users loan against each collateral.
     //collateral address => user address => quantity
@@ -262,10 +264,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
     /// @param _collateral the ERC20 compatible collateral to use, already set up in another function
     /// @param _colAmount the amount of collateral to be transfered to the vault. 
     function _increaseCollateral(IERC20 _collateral, uint256 _colAmount) internal virtual {
-        bool success  =_collateral.transferFrom(msg.sender, address(this), _colAmount);
-        //due to contract size we cannot use SafeERC20 so we check for non-reverting ERC20 failures
-        require(success);
-        
+        _collateral.safeTransferFrom(msg.sender, address(this), _colAmount);        
     }
 
     
@@ -286,9 +285,7 @@ abstract contract Vault_Base_ERC20 is RoleControl(VAULT_TIME_DELAY), Pausable {
         //transfer interest earned on loan to treasury
         //slither-disable-next-line unchecked-transfer
         isoUSD.transfer(treasury, _interestPaid);
-        bool success  = collateral.transfer(msg.sender, _amount);
-        //due to contract size we cannot use SafeERC20 so we check for non-reverting ERC20 failures
-        require(success);
+        collateral.safeTransfer(msg.sender, _amount);
         
     }
 

@@ -9,6 +9,9 @@ pragma abicoder v2;
 import "./helper/interfaces/ILiquidityPoolAvalon.sol";
 import "./helper/interfaces/IMultiDistributor.sol";
 
+//External OpenZeppelin dependancy
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
@@ -17,7 +20,9 @@ import "./RewardClaimer.sol";
 import "./interfaces/IRewardClaimer.sol";
 
 
-contract Vault_Lyra is Vault_Base_ERC20{
+contract Vault_Lyra is Vault_Base_ERC20, ReentrancyGuard{
+
+    using SafeERC20 for IERC20;
     
     //collateral address => user address => rewardClaimer address
     mapping(address => mapping(address => address)) public rewardClaimers;
@@ -82,9 +87,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
             rewardClaimer = address(new RewardClaimer(msg.sender, address(this), address(_collateral), collateralBook));
             rewardClaimers[address(_collateral)][msg.sender] = rewardClaimer;
         }
-        bool success  =_collateral.transferFrom(msg.sender, rewardClaimer, _colAmount);
-        //due to contract size we cannot use SafeERC20 so we check for non-reverting ERC20 failures
-        require(success);
+        _collateral.safeTransferFrom(msg.sender, rewardClaimer, _colAmount);
         
     }
 
@@ -136,7 +139,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         address _collateralAddress,
         uint256 _colAmount,
         uint256 _USDborrowed
-        ) external override whenNotPaused 
+        ) external override whenNotPaused nonReentrant
         {
         _collateralExists(_collateralAddress);
         require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
@@ -189,7 +192,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external override 
+        ) external override nonReentrant
         {
         _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
@@ -233,7 +236,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external override  
+        ) external override nonReentrant
         {
         _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
@@ -306,7 +309,7 @@ contract Vault_Lyra is Vault_Base_ERC20{
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external override  
+        ) external override nonReentrant
         {   
             _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 

@@ -12,6 +12,9 @@ import "./helper/interfaces/IAddressResolver.sol";
 import "./helper/interfaces/IExchanger.sol";
 import "./helper/interfaces/ISystemStatus.sol";
 
+//External OpenZeppelin dependancy
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 //Vault Base for common functions
 import "./Vault_Base_ERC20.sol";
 
@@ -21,8 +24,8 @@ import "./interfaces/IAccessControlledOffchainAggregator.sol";
 
 
 
-contract Vault_Synths is Vault_Base_ERC20 {
-    
+contract Vault_Synths is Vault_Base_ERC20, ReentrancyGuard {
+
     //Constants, private to reduce code size
     bytes32 private constant SUSD_CODE = "sUSD"; 
     bytes32 private constant EXCHANGE_RATES = "ExchangeRates";
@@ -139,7 +142,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         address _collateralAddress,
         uint256 _colAmount,
         uint256 _USDborrowed
-        ) external override whenNotPaused 
+        ) external override whenNotPaused nonReentrant
         {
         _collateralExists(_collateralAddress);
         require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
@@ -193,7 +196,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _colAmount
-        ) external override
+        ) external override nonReentrant
         {
         _collateralExists(_collateralAddress);
         require(collateralPosted[_collateralAddress][msg.sender] > 0, "No existing collateral!"); //feels like semantic overloading and also problematic for dust after a loan is 'closed'
@@ -237,7 +240,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         address _collateralAddress,
         uint256 _collateralToUser,
         uint256 _USDToVault
-        ) external override 
+        ) external override nonReentrant
         {
         _collateralExists(_collateralAddress);
         _closeLoanChecks(_collateralAddress, _collateralToUser, _USDToVault);
@@ -308,7 +311,7 @@ contract Vault_Synths is Vault_Base_ERC20 {
         function callLiquidation(
             address _loanHolder,
             address _collateralAddress
-        ) external override 
+        ) external override nonReentrant
         {   
             _collateralExists(_collateralAddress);
             require(_loanHolder != address(0), "Zero address used"); 

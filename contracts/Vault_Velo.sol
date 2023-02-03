@@ -12,13 +12,14 @@ import "./interfaces/IDepositReceipt.sol";
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./RoleControl.sol";
 
 uint256 constant VAULT_VELO_TIME_DELAY = 3 days;
 
 
-contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
+contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), ReentrancyGuard, Pausable {
 
     //Constants
     uint256 public constant LIQUIDATION_RETURN = 95 ether /100; //95% returned on liquidiation
@@ -401,7 +402,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         uint256 _NFTId,
         uint256 _USDborrowed,
         bool _addingCollateral
-        ) external whenNotPaused  
+        ) external whenNotPaused nonReentrant
         {   
             _collateralExists(_collateralAddress);
             require(!collateralBook.collateralPaused(_collateralAddress), "Paused collateral!");
@@ -477,7 +478,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
     function increaseCollateralAmount(
         address _collateralAddress,
         uint256 _NFTId
-        ) external 
+        ) external nonReentrant
         {
         _collateralExists(_collateralAddress);
         //zero indexes cause problems with mappings and ownership, so refuse them
@@ -542,7 +543,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
         CollateralNFTs calldata _loanNFTs,
         uint256 _USDToVault,
         uint256 _partialPercentage
-        ) external 
+        ) external nonReentrant
         {
         _collateralExists(_collateralAddress);
         //check input NFT slots and ids are correct
@@ -752,7 +753,7 @@ contract Vault_Velo is RoleControl(VAULT_VELO_TIME_DELAY), Pausable {
             address _collateralAddress,
             CollateralNFTs calldata _loanNFTs,
             uint256 _partialPercentage
-        ) external  
+        ) external nonReentrant
         {   
             _validMarketConditions(_collateralAddress, _loanHolder);
             for(uint256 i = 0; i < NFT_LIMIT; i++){
