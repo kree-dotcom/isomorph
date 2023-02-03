@@ -1,6 +1,6 @@
 # Isomorph
 
-Isomorph is an Optimism naitve lending protocol where users can provide a variety of interest generating collaterals to mint the isoUSD stablecoin.
+Isomorph is an Optimism native lending protocol where users can provide a variety of interest generating collaterals to mint the isoUSD stablecoin.
 
 ## Motivation:
 
@@ -30,13 +30,13 @@ As borrowers will wish to use their isoUSD on other DeFi protocols it will vital
 - Begin by cloning the repo
 - The repo contains a submodule so run `git submodule init && git submodule update` to get these files for Velo-Deposit-Tokens. This submodule contains its own tests and documents so please follow its own README.md for testing it.
 - Then run "yarn install" in the main directory to install all required packages
-- Connect your API endpoints and privatekey using the .env file. See sample_env for details.
+- Connect your API endpoints and private key using the .env file. See sample_env for details.
 
 If you swap to a different network you will need to update the static addresses that the Vaults rely on for Lyra, Synthetix and Velodrome. 
 
 - Update ISOUSD_TIME_DELAY in isoUSDToken.sol to a shorter time than it's expected 3 days value.  This is necessary to test Vault_Lyra.sol and Vault_Synths.sol because both rely on external oracles which will break functionality if we skip 3 days ahead and do not update them, updating them is too convoluted so instead we just use a shorter timelock for testing.
 
-- Then run "yarn hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again. The first test run will likely be much slower due to needing to fetch contract information at the fork block height. We use this block height for integration testing as we know all token doners have the balances we need to borrow at this height. If the block height is changed be aware tests using Synths or Lyra systems may fail if the respective external system's circuit breaker is in effect.
+- Then run "yarn hardhat test" to run all tests. All tests should pass, occasionally the API will time out due to some of the tests taking a while to process, if this happens run again. The first test run will likely be much slower due to needing to fetch contract information at the fork block height. We use this block height for integration testing as we know all token donors have the balances we need to borrow at this height. If the block height is changed be aware tests using Synths or Lyra systems may fail if the respective external system's circuit breaker is in effect.
 
 Coverage is currently as follows:
 
@@ -78,5 +78,3 @@ produces 206 results. The above paths were filtered due to either not being writ
 - Lyra: An options issuing protocol native to Optimism, currently offering options on ETH, BTC and SOL markets, with the ability to provide liquidity as a hedged option writer via their liquidity pools.
 
 - Velodrome: An Automated Market Maker on Optimism based on the design of Solidly from Fantom. Offering trading of numerous token pairs and volatile as well as stable pairs, these liquidity pairs receive staking rewards in the form of VELO token rewards.  
-
-
